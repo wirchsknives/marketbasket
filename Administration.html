@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Market Basket Administration</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .alert-info, .alert-success, .alert-danger {
+            margin-bottom: 20px;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        .alert-info { background-color: #d1ecf1; color: #0c5460; }
+        .alert-success { background-color: #d4edda; color: #155724; }
+        .alert-danger { background-color: #f8d7da; color: #721c24; }
+        .table { margin-bottom: 20px; }
+        .editable-cell { cursor: pointer; }
+        .blank-cell { background-color: #f8d7da; }
+        .form-control { margin-bottom: 10px; }
+        .deleted-row { background-color: #f8d7da; opacity: 0.7; }
+    </style>
+</head>
+<body>
+    <div class="container mt-5">
+        <h1>Market Basket Administration</h1>
+        <div id="divMessage" class="alert-info"></div>
+        <div id="divUserInput"></div>
+    </div>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        $(document).ready(function() {
+            let standardDepartments = [];
+            let standardJobClasses = [];
+
+            // Check session on page load
+            $.ajax({
+                url: 'ajax/checkSession.php',
+                type: 'GET',
+                dataType: 'json',
+                success: function(response) {
+                    console.log('checkSession response:', response);
+                    if (response.authenticated) {
+                        loadAdminInterface();
+                    } else {
+                        $('#divMessage').removeClass('alert-info').addClass('alert-danger').text('Please authenticate.');
+                        $('#divUserInput').html(`
+                            <div class="mb-3">
+                                <label for="emailInput" class="form-label">Email</label>
+                                <input type="email" class="form-control" id="emailInput">
+                            </div>
+                            <div class="mb-3">
+                                <label for="townInput" class="form-label">Town</label>
+                                <input type="text" class="form-control" id="townInput">
+                            </div>
+                            <button type="button" id="sendCodeBtn" class="btn btn-primary">Send Verification Code</button>
+                        `);
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error checking session:', status, error);
+                    $('#divMessage').removeClass('alert-info').addClass('alert-danger').text('Error checking session.');
+                }
+            });
+
+            // Authentication handlers (unchanged)
+            $(document).on('click', '#sendCodeBtn', function() {
+                const email = $('#emailInput').val();
+                const town = $('#townInput').val();
+                if (!email || !town) {
+                    $('#divMessage').removeClass('alert-info').addClass('alert-danger').text('Please enter both email and town.');
+                    return;
+                }
+                $.ajax({
+                    url: 'ajax/sendVerificationCode.php',
+                    type: 'POST',
+                    data: { email, town },
+                    dataType: 'json',
+                    success: function(response) {
+                        console.log('sendVerificationCode response:', response);
+                        if (response.success) {
+                            $('#divMessage').removeClass('alert-danger').addClass('alert-info').text('Verification code sent. Please check your email.');
+                            $('#divUserInput').html(`
+                                <div class="mb-3">
+                                    <label for="codeInput" class="form-label">Enter Verification Code</label>
+                                    <input type="text" class="form-control" id="codeInput">
+                                </div>
+                                <button type="button" id="verifyCodeBtn" class="btn btn-primary">Verify Code</button>
+                                <button type="button" id="resendCodeBtn" class="btn btn-secondary ms-2">Resend Code</button>
+                            `);
+                            sessionStorage.setItem('email', email);
+                            sessionStorage.setItem('town', town);
+                        } else {
+                            $('#divMessage').removeClass('alert-info').addClass('alert-danger').text(response.message);
+                        }
+                    },
+                    error: function(xhr, status, error) {
+                        console.error('Error sending verification code:', status, error);
+                        $('#divMessage').removeClass('alert-info').addClass('alert-danger').text('Error sending verification code.');
+                    }
+                });
+            });
+
+            $(document).on('click', '#verifyCodeBtn', function() {
+                const code = $('#codeInput').val();
+                if (!code) {
+                    $('#divMessage').removeClass('alert-info').addClass('alert-danger').text('Please enter the verification code.');
+                    return;
+                }
+                $.ajax({
+                    url: 'ajax/verifyCode.php',
+                    type: 'POST',
+                    data: { code },
+                    dataType: 'json',
+                    success: function(response) {
+                        console.log('verifyCode response:', response);
+                        if (response.success) {
+                            $('#divMessage').removeClass('alert-danger').addClass('alert-success').text('Authentication successful.');
+                            loadAdminInterface();
+                        } else {
+                            $('#divMessage').removeClass('alert-info').addClass('alert-danger').text(response.message);
+                        }
+                    },
+                    error: function(xhr, status, error) {
+                        console.error('Error verifying code:', status, error);
+                        $('#divMessage').removeClass('alert-info').addClass('alert-danger').text('Error verifying code.');
+                    }
+                });
+            });
+
+            $(document).on('click', '#resendCodeBtn', function() {
+                const email = sessionStorage.getItem('email');
+                const town = sessionStorage.getItem('town');
+                if (!email || !town) {
+                    $('#divMessage').removeClass('alert-info').addClass('alert-danger').text('Email or town missing for resending code.');
+                    return;
+                }
+                $.ajax({
+                    url: 'ajax/sendVerificationCode.php',
+                    type: 'POST',
+                    data: { email, town },
+                    dataType: 'json',
+                    success: function(response) {
+                        console.log('resendCode response:', response);
+                        if (response.success) {
+                            $('#divMessage').removeClass('alert-danger').addClass('alert-info').text('Verification code resent. Please check your email.');
+                        } else {
+                            $('#divMessage').removeClass('alert-info').addClass('alert-danger').text(response.message);
+                        }
+                    },
+                    error: function(xhr, status, error) {
+                        console.error('Error resending code:', status, error);
+                        $('#divMessage').removeClass('alert-info').addClass('alert-danger').text('Error resending verification code.');
+                    }
+                });
+            });
+
+            // Load admin interface
+            function loadAdminInterface() {
+                $.ajax({
+                    url: 'ajax/getAdminData.php',
+                    type: 'GET',
+                    dataType: 'json',
+                    success: function(response) {
+                        console.log('getAdminData response:', response);
+                        if (response.success) {
+                            standardDepartments = response.departments;
+                            standardJobClasses = response.jobClasses;
+                            let deptOptions = standardDepartments
+                                .filter(dept => !dept.Deleted)
+                                .map(dept => `<option value="${dept.ID}">${dept.StandardDeptDesc}</option>`).join('');
+                            $('#divMessage').removeClass('alert-danger').addClass('alert-info').text('Manage standard departments and job classes.');
+                            $('#divUserInput').html(`
+                                <h3>Standard Departments</h3>
+                                <table class="table table-bordered table-striped" id="deptTable">
+                                    <thead>
+                                        <tr>
+                                            <th>ID</th>
+                                            <th>Description</th>
+                                            <th>Deleted</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="deptTableBody"></tbody>
+                                </table>
+                                <h4>Add New Department</h4>
+                                <div class="mb-3">
+                                    <input type="text" class="form-control" id="newDeptDesc" placeholder="Enter department description">
+                                    <button type="button" id="addDeptBtn" class="btn btn-primary mt-2">Add Department</button>
+                                </div>
+                                <h3>Standard Job Classes</h3>
+                                <table class="table table-bordered table-striped" id="jobTable">
+                                    <thead>
+                                        <tr>
+                                            <th>ID</th>
+                                            <th>Description</th>
+                                            <th>Department</th>
+                                            <th>Deleted</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="jobTableBody"></tbody>
+                                </table>
+                                <h4>Add New Job Class</h4>
+                                <div class="mb-3">
+                                    <input type="text" class="form-control" id="newJobDesc" placeholder="Enter job class description">
+                                    <select class="form-control" id="newJobDept">
+                                        <option value="">Select Department</option>
+                                        ${deptOptions}
+                                    </select>
+                                    <button type="button" id="addJobBtn" class="btn btn-primary mt-2">Add Job Class</button>
+                                </div>
+                                <a href="inputMarketBasket.html" class="btn btn-secondary mt-3">Back to Input</a>
+                            `);
+                            loadTableData();
+                        } else {
+                            $('#divMessage').removeClass('alert-info').addClass('alert-danger').text(response.message);
+                        }
+                    },
+                    error: function(xhr, status, error) {
+                        console.error('Error loading admin data:', status, error);
+                        $('#divMessage').removeClass('alert-info').addClass('alert-danger').text('Error loading admin data.');
+                    }
+                });
+            }
+
+            // Load data for both tables
+            function loadTableData() {
+                let deptHtml = '';
+                standardDepartments.forEach(dept => {
+                    deptHtml += `
+                        <tr data-id="${dept.ID}" class="${dept.Deleted ? 'deleted-row' : ''}">
+                            <td>${dept.ID}</td>
+                            <td class="editable-dept" contenteditable="false">${dept.StandardDeptDesc}</td>
+                            <td>${dept.Deleted ? 'Yes' : 'No'}</td>
+                            <td>
+                                <button class="btn btn-sm btn-primary edit-dept-btn" ${dept.Deleted ? 'disabled' : ''}>Edit</button>
+                                <button class="btn btn-sm btn-danger mark-deleted-dept-btn" ${dept.Deleted ? 'disabled' : ''}>Mark as Deleted</button>
+                            </td>
+                        </tr>
+                    `;
+                });
+                $('#deptTableBody').html(deptHtml);
+
+                let jobHtml = '';
+                standardJobClasses.forEach(job => {
+                    const dept = standardDepartments.find(d => d.ID === job.StandardDeptID) || { StandardDeptDesc: 'None' };
+                    jobHtml += `
+                        <tr data-id="${job.ID}" class="${job.Deleted ? 'deleted-row' : ''}">
+                            <td>${job.ID}</td>
+                            <td class="editable-job" contenteditable="false">${job.StandardJobClassDesc}</td>
+                            <td class="editable-job-dept" data-dept-id="${job.StandardDeptID || ''}">${dept.StandardDeptDesc}</td>
+                            <td>${job.Deleted ? 'Yes' : 'No'}</td>
+                            <td>
+                                <button class="btn btn-sm btn-primary edit-job-btn" ${job.Deleted ? 'disabled' : ''}>Edit</button>
+                                <button class="btn btn-sm btn-danger mark-deleted-job-btn" ${job.Deleted ? 'disabled' : ''}>Mark as Deleted</button>
+                            </td>
+                        </tr>
+                    `;
+                });
+                $('#jobTableBody').html(jobHtml);
+
+                $('#divMessage').removeClass('alert-danger').addClass('alert-success').text('Data loaded successfully.');
+            }
+
+            // Add new department
+            $(document).on('click', '#addDeptBtn', function() {
+                const desc = $('#newDeptDesc').val().trim();
+                if (!desc) {
+                    $('#divMessage').removeClass('alert-info').addClass('alert-danger').text('Please enter a department description.');
+                    return;
+                }
+                $.ajax({
+                    url: 'ajax/addStandardDepartment.php',
+                    type: 'POST',
+                    data: { StandardDeptDesc: desc },
+                    dataType: 'json',
+                    success: function(response) {
+                        console.log('addStandardDepartment response:', response);
+                        if (response.success) {
+                            $('#newDeptDesc').val('');
+                            loadAdminInterface();
+                            $('#divMessage').removeClass('alert-danger').addClass('alert-success').text('Department added successfully.');
+                        } else {
+                            $('#divMessage').removeClass('alert-info').addClass('alert-danger').text(response.message);
+                        }
+                    },
+                    error: function(xhr, status, error) {
+                        console.error('Error adding department:', status, error);
+                        $('#divMessage').removeClass('alert-info').addClass('alert-danger').text('Error adding department.');
+                    }
+                });
+            });
+
+            // Add new job class
+            $(document).on('click', '#addJobBtn', function() {
+                const desc = $('#newJobDesc').val().trim();
+                const deptId = $('#newJobDept').val();
+                if (!desc) {
+                    $('#divMessage').removeClass('alert-info').addClass('alert-danger').text('Please enter a job class description.');
+                    return;
+                }
+                if (!deptId) {
+                    $('#divMessage').removeClass('alert-info').addClass('alert-danger').text('Please select a department.');
+                    return;
+                }
+                $.ajax({
+                    url: 'ajax/addStandardJobClass.php',
+                    type: 'POST',
+                    data: { StandardJobClassDesc: desc, StandardDeptID: deptId },
+                    dataType: 'json',
+                    success: function(response) {
+                        console.log('addStandardJobClass response:', response);
+                        if (response.success) {
+                            $('#newJobDesc').val('');
+                            $('#newJobDept').val('');
+                            loadAdminInterface();
+                            $('#divMessage').removeClass('alert-danger').addClass('alert-success').text('Job class added successfully.');
+                        } else {
+                            $('#divMessage').removeClass('alert-info').addClass('alert-danger').text(response.message);
+                        }
+                    },
+                    error: function(xhr, status, error) {
+                        console.error('Error adding job class:', status, error);
+                        $('#divMessage').removeClass('alert-info').addClass('alert-danger').text('Error adding job class.');
+                    }
+                });
+            });
+
+            // Edit department
+            $(document).on('click', '.edit-dept-btn', function() {
+                const row = $(this).closest('tr');
+                const cell = row.find('.editable-dept');
+                const isEditable = cell.attr('contenteditable') === 'true';
+                if (isEditable) {
+                    const id = row.data('id');
+                    const newDesc = cell.text().trim();
+                    if (!newDesc) {
+                        $('#divMessage').removeClass('alert-info').addClass('alert-danger').text('Department description cannot be empty.');
+                        return;
+                    }
+                    $.ajax({
+                        url: 'ajax/updateStandardDepartment.php',
+                        type: 'POST',
+                        data: { ID: id, StandardDeptDesc: newDesc },
+                        dataType: 'json',
+                        success: function(response) {
+                            console.log('updateStandardDepartment response:', response);
+                            if (response.success) {
+                                cell.attr('contenteditable', 'false').removeClass('blank-cell');
+                                row.find('.edit-dept-btn').text('Edit');
+                                $('#divMessage').removeClass('alert-danger').addClass('alert-success').text('Department updated successfully.');
+                            } else {
+                                $('#divMessage').removeClass('alert-info').addClass('alert-danger').text(response.message);
+                            }
+                        },
+                        error: function(xhr, status, error) {
+                            console.error('Error updating department:', status, error);
+                            $('#divMessage').removeClass('alert-info').addClass('alert-danger').text('Error updating department.');
+                        }
+                    });
+                } else {
+                    cell.attr('contenteditable', 'true').focus();
+                    $(this).text('Save');
+                }
+            });
+
+            // Edit job class
+            $(document).on('click', '.edit-job-btn', function() {
+                const row = $(this).closest('tr');
+                const descCell = row.find('.editable-job');
+                const deptCell = row.find('.editable-job-dept');
+                const isEditable = descCell.attr('contenteditable') === 'true';
+                if (isEditable) {
+                    const id = row.data('id');
+                    const newDesc = descCell.text().trim();
+                    const newDeptId = deptCell.find('select').val();
+                    if (!newDesc) {
+                        $('#divMessage').removeClass('alert-info').addClass('alert-danger').text('Job class description cannot be empty.');
+                        return;
+                    }
+                    if (!newDeptId) {
+                        $('#divMessage').removeClass('alert-info').addClass('alert-danger').text('Please select a department.');
+                        return;
+                    }
+                    $.ajax({
+                        url: 'ajax/updateStandardJobClass.php',
+                        type: 'POST',
+                        data: { ID: id, StandardJobClassDesc: newDesc, StandardDeptID: newDeptId },
+                        dataType: 'json',
+                        success: function(response) {
+                            console.log('updateStandardJobClass response:', response);
+                            if (response.success) {
+                                descCell.attr('contenteditable', 'false').removeClass('blank-cell');
+                                deptCell.html(standardDepartments.find(d => d.ID == newDeptId)?.StandardDeptDesc || 'None');
+                                row.find('.edit-job-btn').text('Edit');
+                                $('#divMessage').removeClass('alert-danger').addClass('alert-success').text('Job class updated successfully.');
+                            } else {
+                                $('#divMessage').removeClass('alert-info').addClass('alert-danger').text(response.message);
+                            }
+                        },
+                        error: function(xhr, status, error) {
+                            console.error('Error updating job class:', status, error);
+                            $('#divMessage').removeClass('alert-info').addClass('alert-danger').text('Error updating job class.');
+                        }
+                    });
+                } else {
+                    descCell.attr('contenteditable', 'true').focus();
+                    const currentDeptId = deptCell.data('dept-id');
+                    let deptOptions = standardDepartments
+                        .filter(d => !d.Deleted)
+                        .map(d => `<option value="${d.ID}" ${d.ID == currentDeptId ? 'selected' : ''}>${d.StandardDeptDesc}</option>`).join('');
+                    deptCell.html(`<select class="form-control">${deptOptions}</select>`);
+                    $(this).text('Save');
+                }
+            });
+
+            // Mark department as deleted
+            $(document).on('click', '.mark-deleted-dept-btn', function() {
+                const row = $(this).closest('tr');
+                const id = row.data('id');
+                const desc = row.find('.editable-dept').text();
+                let options = standardDepartments
+                    .filter(dept => dept.ID !== id && !dept.Deleted)
+                    .map(dept => `<option value="${dept.ID}">${dept.StandardDeptDesc}</option>`).join('');
+                if (!options) {
+                    $('#divMessage').removeClass('alert-info').addClass('alert-danger').text('No active departments available for reassignment.');
+                    return;
+                }
+                $('#divUserInput').html(`
+                    <h4>Mark Department as Deleted: ${desc}</h4>
+                    <div class="mb-3">
+                        <label for="replacementDept" class="form-label">Select Replacement Department</label>
+                        <select class="form-control" id="replacementDept">
+                            <option value="">Select a replacement department</option>
+                            ${options}
+                        </select>
+                    </div>
+                    <button type="button" id="confirmDeleteDeptBtn" class="btn btn-danger">Confirm Mark as Deleted</button>
+                    <button type="button" class="btn btn-secondary ms-2" onclick="loadAdminInterface()">Cancel</button>
+                `);
+                $('#confirmDeleteDeptBtn').data('id', id);
+            });
+
+            // Confirm department deletion
+            $(document).on('click', '#confirmDeleteDeptBtn', function() {
+                const id = $(this).data('id');
+                const replacementId = $('#replacementDept').val();
+                if (!replacementId) {
+                    $('#divMessage').removeClass('alert-info').addClass('alert-danger').text('Please select a replacement department.');
+                    return;
+                }
+                $.ajax({
+                    url: 'ajax/deleteStandardDepartment.php',
+                    type: 'POST',
+                    data: { ID: id, ReplacementID: replacementId },
+                    dataType: 'json',
+                    success: function(response) {
+                        console.log('deleteStandardDepartment response:', response);
+                        if (response.success) {
+                            loadAdminInterface();
+                            $('#divMessage').removeClass('alert-danger').addClass('alert-success').text('Department marked as deleted and mappings reassigned.');
+                        } else {
+                            $('#divMessage').removeClass('alert-info').addClass('alert-danger').text(response.message);
+                        }
+                    },
+                    error: function(xhr, status, error) {
+                        console.error('Error marking department as deleted:', status, error);
+                        $('#divMessage').removeClass('alert-info').addClass('alert-danger').text('Error marking department as deleted.');
+                    }
+                });
+            });
+
+            // Mark job class as deleted
+            $(document).on('click', '.mark-deleted-job-btn', function() {
+                const row = $(this).closest('tr');
+                const id = row.data('id');
+                const desc = row.find('.editable-job').text();
+                const deptId = row.find('.editable-job-dept').data('dept-id');
+                let options = standardJobClasses
+                    .filter(job => job.ID !== id && !job.Deleted && job.StandardDeptID == deptId)
+                    .map(job => `<option value="${job.ID}">${job.StandardJobClassDesc}</option>`).join('');
+                if (!options) {
+                    $('#divMessage').removeClass('alert-info').addClass('alert-danger').text('No active job classes in the same department available for reassignment.');
+                    return;
+                }
+                $('#divUserInput').html(`
+                    <h4>Mark Job Class as Deleted: ${desc}</h4>
+                    <div class="mb-3">
+                        <label for="replacementJob" class="form-label">Select Replacement Job Class</label>
+                        <select class="form-control" id="replacementJob">
+                            <option value="">Select a replacement job class</option>
+                            ${options}
+                        </select>
+                    </div>
+                    <button type="button" id="confirmDeleteJobBtn" class="btn btn-danger">Confirm Mark as Deleted</button>
+                    <button type="button" class="btn btn-secondary ms-2" onclick="loadAdminInterface()">Cancel</button>
+                `);
+                $('#confirmDeleteJobBtn').data('id', id);
+            });
+
+            // Confirm job class deletion
+            $(document).on('click', '#confirmDeleteJobBtn', function() {
+                const id = $(this).data('id');
+                const replacementId = $('#replacementJob').val();
+                if (!replacementId) {
+                    $('#divMessage').removeClass('alert-info').addClass('alert-danger').text('Please select a replacement job class.');
+                    return;
+                }
+                $.ajax({
+                    url: 'ajax/deleteStandardJobClass.php',
+                    type: 'POST',
+                    data: { ID: id, ReplacementID: replacementId },
+                    dataType: 'json',
+                    success: function(response) {
+                        console.log('deleteStandardJobClass response:', response);
+                        if (response.success) {
+                            loadAdminInterface();
+                            $('#divMessage').removeClass('alert-danger').addClass('alert-success').text('Job class marked as deleted and mappings reassigned.');
+                        } else {
+                            $('#divMessage').removeClass('alert-info').addClass('alert-danger').text(response.message);
+                        }
+                    },
+                    error: function(xhr, status, error) {
+                        console.error('Error marking job class as deleted:', status, error);
+                        $('#divMessage').removeClass('alert-info').addClass('alert-danger').text('Error marking job class as deleted.');
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>

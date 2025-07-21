@@ -1,0 +1,5 @@
+../includes/db.php
+uploads/ 
+vendor/ 
+vendor_backup/ 
+vendorold/ 

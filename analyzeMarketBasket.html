@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Market Basket Data Analysis</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Comic+Neue:wght@700&display=swap" rel="stylesheet">
+    <style>
+        #divHeader h1 {
+            font-family: 'Comic Neue', cursive;
+            font-size: 2.5rem;
+            color: #333;
+        }
+        #divHeader img {
+            height: 1.5in;
+            width: auto;
+            position: absolute;
+            top: 10px;
+            right: 10px;
+        }
+        #divMessage {
+            border: 2px solid #ccc;
+            border-radius: 15px;
+            padding: 15px;
+            margin-bottom: 20px;
+            width: 75%;
+        }
+        .checked-row td:not(:first-child) {
+            background-color: #e6ffe6;
+        }
+        .unchecked-row td:not(:first-child) {
+            background-color: #fff3cd;
+            text-decoration: line-through;
+        }
+        #divUIHeader {
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        #divUIDetail {
+            font-weight: normal;
+        }
+        #analysisTableContainer {
+            margin-top: 20px;
+        }
+        #chartContainer {
+            max-width: 800px;
+            margin: 20px auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container mt-3">
+        <div id="divHeader" class="d-flex align-items-center position-relative">
+            <h1>Market Basket Data Analysis</h1>
+            <img src="images/MarketBasket.png" alt="Market Basket Logo">
+        </div>
+        <div id="divMessage" class="alert alert-info">
+            Please select datasets to analyze.
+        </div>
+        <div id="divUserInput">
+            <div id="divUIHeader"></div>
+            <div id="divUIDetail">
+                <table class="table table-bordered table-striped" id="summaryTable">
+                    <thead>
+                        <tr>
+                            <th><input type="checkbox" id="selectAll"></th>
+                            <th>Town</th>
+                            <th>Year</th>
+                            <th>Department Code Desc</th>
+                            <th>Count</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+                <button type="button" id="analyzeSelectedBtn" class="btn btn-primary mt-3">Analyze Selected</button>
+                <a href="inputMarketBasket.html" class="btn btn-secondary mt-3 ms-2">Back to Input</a>
+            </div>
+            <div id="analysisTableContainer" style="display: none;">
+                <h3>Selected Dataset Details</h3>
+                <table class="table table-bordered table-striped" id="analysisTable">
+                    <thead>
+                        <tr>
+                            <th>Town</th>
+                            <th>Year</th>
+                            <th>Department Code Desc</th>
+                            <th>Job Class Code Desc</th>
+                            <th>Scheduled Hours</th>
+                            <th>Hourly Rate</th>
+                            <th>Annual Pay</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+            <div id="chartContainer" style="display: none;">
+                <h3>Annual Pay by Job Class Code Desc</h3>
+                <canvas id="barChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script>
+        $(document).ready(function() {
+            let selectedHeaderIds = [];
+            let analysisTable = null;
+            let barChart = null;
+
+            // Check session on page load
+            $.ajax({
+                url: 'ajax/checkSession.php',
+                type: 'GET',
+                dataType: 'json',
+                success: function(response) {
+                    if (response.authenticated) {
+                        loadSummaryData(response.email, response.town);
+                    } else {
+                        $('#divMessage').removeClass('alert-info').addClass('alert-danger').text('Please log in to access analysis.');
+                        $('#divUserInput').html('<a href="inputMarketBasket.html" class="btn btn-primary">Go to Login</a>');
+                    }
+                },
+                error: function() {
+                    $('#divMessage').removeClass('alert-info').addClass('alert-danger').text('Error checking session.');
+                }
+            });
+
+            // Load summary data
+            function loadSummaryData(email, town) {
+                $.ajax({
+                    url: 'ajax/loadAnalysisData.php',
+                    type: 'GET',
+                    data: { action: 'summary' },
+                    dataType: 'json',
+                    success: function(response) {
+                        if (response.success) {
+                            $('#divUIHeader').html(`<strong>Email:</strong> ${email} | <strong>Town:</strong> ${town}`);
+                            renderSummaryTable(response.data);
+                        } else {
+                            $('#divMessage').removeClass('alert-info').addClass('alert-danger').text(response.message);
+                        }
+                    },
+                    error: function() {
+                        $('#divMessage').removeClass('alert-info').addClass('alert-danger').text('Error loading summary data.');
+                    }
+                });
+            }
+
+            // Render summary table
+            function renderSummaryTable(data) {
+                const tbody = $('#summaryTable tbody');
+                tbody.empty();
+                data.forEach((row, index) => {
+                    tbody.append(`
+                        <tr class="unchecked-row">
+                            <td><input type="checkbox" class="row-checkbox" data-index="${index}" data-headerid="${row.id}"></td>
+                            <td>${row.town}</td>
+                            <td>${row.year}</td>
+                            <td>${row.departmentCodeDesc}</td>
+                            <td>${row.deptCount}</td>
+                        </tr>
+                    `);
+                });
+                $('#divMessage').removeClass('alert-danger').addClass('alert-info').text('Select datasets and click Analyze Selected.');
+            }
+
+            // Handle select all
+            $(document).on('change', '#selectAll', function() {
+                const checked = $(this).prop('checked');
+                $('.row-checkbox').prop('checked', checked).each(function() {
+                    const index = $(this).data('index');
+                    const headerId = $(this).data('headerid');
+                    $(this).closest('tr').toggleClass('checked-row', checked).toggleClass('unchecked-row', !checked);
+                    if (checked) {
+                        if (!selectedHeaderIds.includes(headerId)) selectedHeaderIds.push(headerId);
+                    } else {
+                        selectedHeaderIds = selectedHeaderIds.filter(id => id !== headerId);
+                    }
+                });
+            });
+
+            // Handle row checkbox
+            $(document).on('change', '.row-checkbox', function() {
+                const index = $(this).data('index');
+                const headerId = $(this).data('headerid');
+                const checked = $(this).prop('checked');
+                $(this).closest('tr').toggleClass('checked-row', checked).toggleClass('unchecked-row', !checked);
+                if (checked) {
+                    if (!selectedHeaderIds.includes(headerId)) selectedHeaderIds.push(headerId);
+                } else {
+                    selectedHeaderIds = selectedHeaderIds.filter(id => id !== headerId);
+                }
+                updateSelectAll();
+            });
+
+            // Update select all checkbox
+            function updateSelectAll() {
+                const allChecked = $('.row-checkbox').length === $('.row-checkbox:checked').length;
+                $('#selectAll').prop('checked', allChecked);
+            }
+
+            // Analyze selected datasets
+            $(document).on('click', '#analyzeSelectedBtn', function() {
+                if (!selectedHeaderIds.length) {
+                    $('#divMessage').removeClass('alert-info').addClass('alert-danger').text('Please select at least one dataset.');
+                    return;
+                }
+
+                const payload = { action: 'details', headerIds: selectedHeaderIds };
+                console.log('Sending payload:', JSON.stringify(payload, null, 2)); // Debug
+
+                $.ajax({
+                    url: 'ajax/loadAnalysisData.php',
+                    type: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify(payload),
+                    dataType: 'json',
+                    success: function(response) {
+                        console.log('Response:', response); // Debug
+                        if (response.success) {
+                            renderAnalysisTable(response.data);
+                            renderBarChart(response.data);
+                            $('#analysisTableContainer, #chartContainer').show();
+                            $('#divMessage').removeClass('alert-danger').addClass('alert-success').text('Data loaded successfully.');
+                        } else {
+                            $('#divMessage').removeClass('alert-info').addClass('alert-danger').text(response.message);
+                        }
+                    },
+                    error: function(xhr, status, error) {
+                        console.error('AJAX Error:', xhr.status, error, xhr.responseText); // Debug
+                        $('#divMessage').removeClass('alert-info').addClass('alert-danger').text('Error loading analysis data: ' + (xhr.responseText || 'Unknown error'));
+                    }
+                });
+            });
+
+            // Render analysis DataTable
+            function renderAnalysisTable(data) {
+                if (analysisTable) analysisTable.destroy();
+                const tbody = $('#analysisTable tbody');
+                tbody.empty();
+                data.forEach(row => {
+                    tbody.append(`
+                        <tr>
+                            <td>${row.town || ''}</td>
+                            <td>${row.UYear || ''}</td>                        
+                            <td>${row[1] || ''}</td>
+                            <td>${row[2] || ''}</td>
+                            <td>${row[3] || ''}</td>
+                            <td>${row[4] || ''}</td>
+                            <td>${row[5] || ''}</td>
+                        </tr>
+                    `);
+                });
+                analysisTable = $('#analysisTable').DataTable({
+                    pageLength: 10,
+                    order: [[1, 'asc']],
+                    columns: [
+                        { title: "Town" },
+                        { title: "Year" },
+                        { title: "Department Code Desc" },
+                        { title: "Job Class Code Desc" },
+                        { title: "Scheduled Hours" },
+                        { title: "Hourly Rate" },
+                        { title: "Annual Pay" }
+                    ]                    
+                });
+            }
+
+            // Render bar chart
+            function renderBarChart(data) {
+                if (barChart) barChart.destroy();
+                const jobClasses = [...new Set(data.map(row => row[2]))]; // Unique Job Class Code Desc
+                const annualPays = jobClasses.map(job => {
+                    const rows = data.filter(row => row[2] === job && row[5]);
+                    return rows.reduce((sum, row) => sum + parseFloat(row[5] || 0), 0);
+                });
+
+                const ctx = document.getElementById('barChart').getContext('2d');
+                barChart = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: jobClasses,
+                        datasets: [{
+                            label: 'Total Annual Pay',
+                            data: annualPays,
+                            backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                            borderColor: 'rgba(75, 192, 192, 1)',
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        scales: {
+                            y: { beginAtZero: true, title: { display: true, text: 'Annual Pay ($)' } },
+                            x: { title: { display: true, text: 'Job Class Code Desc' } }
+                        }
+                    }
+                });
+            }
+        });
+    </script>
+</body>
+</html>

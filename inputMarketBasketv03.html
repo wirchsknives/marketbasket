@@ -1,0 +1,873 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Market Basket Data Input</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Comic+Neue:wght@700&display=swap');
+        #divHeader h1 {
+            font-family: 'Comic Neue', cursive;
+            font-size: 2.5rem;
+            color: #333;
+        }
+        #divHeader img {
+            height: 1.5in;
+            width: auto;
+            position: absolute;
+            top: 10px;
+            right: 10px;
+        }
+        #divMessage {
+            border: 2px solid #ccc;
+            border-radius: 15px;
+            padding: 15px;
+            margin-bottom: 20px;
+            width: 75%;
+        }
+        .editable-cell {
+            cursor: pointer;
+        }
+        .editable-cell:hover {
+            background-color: #f0f0f0;
+        }
+        .checked-row td:not(:first-child) {
+            background-color: #e6ffe6;
+        }
+        .unchecked-row td:not(:first-child) {
+            background-color: #fff3cd;
+            text-decoration: line-through;
+        }
+        .blank-cell {
+            background-color: yellow !important;
+        }
+        #divUIHeader {
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        #divUIDetail {
+            font-weight: normal;
+        }
+    </style>
+</head>
+<body>
+    <!-- HTML body remains unchanged -->
+    <div class="container mt-3">
+        <div id="divHeader" class="d-flex align-items-center position-relative">
+            <h1>Market Basket Data Input</h1>
+            <img src="images/MarketBasket.png" alt="Market Basket Logo">
+        </div>
+        <div id="divMessage" class="alert alert-info">
+            Please enter your email address so we can authenticate you.
+        </div>
+        <div id="divUserInput">
+            <div class="mb-3">
+                <label for="email" class="form-label">Email Address</label>
+                <input type="email" class="form-control" id="email" required>
+            </div>
+            <button type="button" id="sendCodeBtn" class="btn btn-primary">Send Code</button>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<script>
+   // Define showInputOptions globally
+   function showInputOptions() {
+        $.ajax({
+            url: 'ajax/checkExistingData.php',
+            type: 'GET',
+            dataType: 'json',
+            success: function(response) {
+                if (response.success) {
+                    const hasData = response.hasData;
+                    $('#divMessage').removeClass('alert-danger').addClass('alert-info').text('Choose a data entry method.');
+                    $('#divUserInput').html(`
+                        <div class="mb-3">
+                            <button type="button" id="manualEntryBtn" class="btn btn-primary me-2">Manual Entry</button>
+                            <button type="button" id="uploadFileBtn" class="btn btn-primary me-2">Upload File</button>
+                            <button type="button" id="copyPasteBtn" class="btn btn-primary me-2">Copy and Paste</button>
+                            <button type="button" id="editExistingBtn" class="btn btn-primary" ${hasData ? '' : 'disabled'}>Edit Existing Data</button>
+                        </div>
+                    `);
+                } else {
+                    $('#divMessage').removeClass('alert-info').addClass('alert-danger').text(response.message);
+                }
+            },
+            error: function() {
+                $('#divMessage').removeClass('alert-info').addClass('alert-danger').text('Error checking for existing data.');
+            }
+        });
+    }
+
+    // Helper function to parse CSV rows (unchanged)
+    function parseCSVRow(row, delimiter) {
+        const result = [];
+        let current = '';
+        let inQuotes = false;
+        for (let i = 0; i < row.length; i++) {
+            const char = row[i];
+            if (char === '"') {
+                inQuotes = !inQuotes;
+            } else if (char === delimiter && !inQuotes) {
+                result.push(current.trim());
+                current = '';
+            } else {
+                current += char;
+            }
+        }
+        result.push(current.trim());
+        return result;
+    }
+
+    $(document).ready(function() {
+        let tableData = [];
+        let isEditingExisting = false;
+        let selectedHeaderId = null;
+        let newRowData = { checked: true };
+        let standardDepartments = [];
+        let standardJobClasses = [];
+        const columns = [
+            { id: 1, name: 'Department Code Desc' },
+            { id: 2, name: 'Job Class Code Desc' },
+            { id: 3, name: 'Scheduled Hours' },
+            { id: 4, name: 'Hourly Rate' },
+            { id: 5, name: 'Annual Pay' }
+        ];
+
+        // Fetch standard departments and job classes
+        function loadStandardValues() {
+            $.ajax({
+                url: 'ajax/getStandardValues.php',
+                type: 'GET',
+                dataType: 'json',
+                success: function(response) {
+                    console.log('loadStandardValues response:', response);
+                    if (response.success) {
+                        standardDepartments = response.departments;
+                        standardJobClasses = response.jobClasses;
+                        renderTable(); // Re-render if already loaded
+                    } else {
+                        $('#divMessage').removeClass('alert-info').addClass('alert-danger').text(response.message);
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error loading standard values:', status, error);
+                    $('#divMessage').removeClass('alert-info').addClass('alert-danger').text('Error loading standard values.');
+                }
+            });
+        }
+
+        // Call on page load
+        loadStandardValues();
+
+        function validateAndToggleSubmitButton() {
+            let allValid = true;
+            $('.row-checkbox:checked').each(function() {
+                const index = $(this).data('index');
+                const row = tableData[index];
+                if (row && row.checked) {
+                    for (let i = 1; i <= 5; i++) {
+                        if (!row[i] || row[i].trim() === '') {
+                            allValid = false;
+                            break;
+                        }
+                    }
+                }
+            });
+            $('#submitDataBtn').prop('disabled', !allValid);
+        }
+
+        function autoAssignStandards(row) {
+            const deptDesc = (row[1] || '').trim().toLowerCase();
+            const jobDesc = (row[2] || '').trim().toLowerCase();
+            const deptMatch = standardDepartments.find(d => d.StandardDeptDesc.toLowerCase() === deptDesc && !d.Deleted);
+            row.standardDeptID = deptMatch ? deptMatch.ID : null;
+            if (row.standardDeptID) {
+                const jobMatch = standardJobClasses.find(j => j.StandardJobClassDesc.toLowerCase() === jobDesc && j.StandardDeptID === row.standardDeptID && !j.Deleted);
+                row.standardJobClassID = jobMatch ? jobMatch.ID : null;
+            } else {
+                row.standardJobClassID = null;
+            }
+            return row;
+        }
+
+        function renderTable(email = '', town = '') {
+            let html = `
+                <div id="divUIHeader">
+                    <strong>Email:</strong> ${email} | <strong>Town:</strong> ${town}
+                </div>
+                <div id="divUIDetail">
+                    <table class="table table-bordered table-striped">
+                        <thead>
+                            <tr>
+                                <th><input type="checkbox" id="selectAll" ${tableData.every(row => row.checked) ? 'checked' : ''}></th>
+                                ${columns.map(col => `<th>${col.name}</th>`).join('')}
+                                <th>Standard Mapping</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+            `;
+            tableData.forEach((row, index) => {
+                const jobOptions = row.standardDeptID
+                    ? standardJobClasses
+                        .filter(j => j.StandardDeptID == row.standardDeptID && !j.Deleted)
+                        .map(j => `<option value="${j.ID}" ${row.standardJobClassID == j.ID ? 'selected' : ''}>${j.StandardJobClassDesc}</option>`).join('')
+                    : '<option value="">Select a department first</option>';
+                html += `
+                    <tr class="${row.checked ? 'checked-row' : 'unchecked-row'}">
+                        <td><input type="checkbox" class="row-checkbox" data-index="${index}" ${row.checked ? 'checked' : ''}></td>
+                        ${columns.map(col => `
+                            <td class="editable-cell ${row.checked && (!row[col.id] || row[col.id].trim() === '') ? 'blank-cell' : ''}" data-index="${index}" data-column="${col.id}" contenteditable="true">${row[col.id] || ''}</td>
+                        `).join('')}
+                        <td>
+                            <select class="form-control standard-dept" data-index="${index}">
+                                <option value="">Select Standard Department</option>
+                                ${standardDepartments.filter(d => !d.Deleted).map(dept => `<option value="${dept.ID}" ${row.standardDeptID == dept.ID ? 'selected' : ''}>${dept.StandardDeptDesc}</option>`).join('')}
+                            </select>
+                            <select class="form-control standard-job" data-index="${index}">
+                                ${jobOptions}
+                            </select>
+                        </td>
+                    </tr>
+                `;
+            });
+            const newRowJobOptions = newRowData.standardDeptID
+                ? standardJobClasses
+                    .filter(j => j.StandardDeptID == newRowData.standardDeptID && !j.Deleted)
+                    .map(j => `<option value="${j.ID}" ${newRowData.standardJobClassID == j.ID ? 'selected' : ''}>${j.StandardJobClassDesc}</option>`).join('')
+                : '<option value="">Select a department first</option>';
+            html += `
+                    <tr class="checked-row new-row">
+                        <td><input type="checkbox" checked></td>
+                        ${columns.map(col => `
+                            <td class="editable-cell new-row ${!newRowData[col.id] || newRowData[col.id].trim() === '' ? 'blank-cell' : ''}" data-column="${col.id}" contenteditable="true">${newRowData[col.id] || ''}</td>
+                        `).join('')}
+                        <td>
+                            <select class="form-control standard-dept new-row">
+                                <option value="">Select Standard Department</option>
+                                ${standardDepartments.filter(d => !d.Deleted).map(dept => `<option value="${dept.ID}" ${newRowData.standardDeptID == dept.ID ? 'selected' : ''}>${dept.StandardDeptDesc}</option>`).join('')}
+                            </select>
+                            <select class="form-control standard-job new-row">
+                                ${newRowJobOptions}
+                            </select>
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+                <button type="button" id="submitDataBtn" class="btn btn-primary mt-3">Submit Data</button>
+                <a href="analyzeMarketBasket.html" class="btn btn-secondary mt-3 ms-2">Analyze Data</a>
+                <button type="button" class="btn btn-secondary mt-3 ms-2" onclick="showInputOptions()">Back to Input Options</button>
+                </div>
+            `;
+            $('#divUserInput').html(html);
+            validateAndToggleSubmitButton();
+        }
+
+        // Check session on page load (unchanged)
+        $.ajax({
+            url: 'ajax/checkSession.php',
+            type: 'GET',
+            dataType: 'json',
+            success: function(response) {
+                console.log('checkSession response:', response);
+                if (response.authenticated) {
+                    showInputOptions();
+                } else {
+                    $('#divMessage').removeClass('alert-info').addClass('alert-danger').text('Please authenticate.');
+                    $('#divUserInput').html(`
+                        <div class="mb-3">
+                            <label for="emailInput" class="form-label">Email</label>
+                            <input type="email" class="form-control" id="emailInput">
+                        </div>
+                        <div class="mb-3">
+                            <label for="townInput" class="form-label">Town</label>
+                            <input type="text" class="form-control" id="townInput">
+                        </div>
+                        <button type="button" id="sendCodeBtn" class="btn btn-primary">Send Verification Code</button>
+                    `);
+                }
+            },
+            error: function(xhr, status, error) {
+                console.error('Error checking session:', status, error);
+                $('#divMessage').removeClass('alert-info').addClass('alert-danger').text('Error checking session.');
+            }
+        });
+
+        // Authentication handlers (unchanged)
+        $(document).on('click', '#sendCodeBtn', function() {
+            const email = $('#emailInput').val();
+            const town = $('#townInput').val();
+            if (!email || !town) {
+                $('#divMessage').removeClass('alert-info').addClass('alert-danger').text('Please enter both email and town.');
+                return;
+            }
+            $.ajax({
+                url: 'ajax/sendVerificationCode.php',
+                type: 'POST',
+                data: { email, town },
+                dataType: 'json',
+                success: function(response) {
+                    console.log('sendVerificationCode response:', response);
+                    if (response.success) {
+                        $('#divMessage').removeClass('alert-danger').addClass('alert-info').text('Verification code sent. Please check your email.');
+                        $('#divUserInput').html(`
+                            <div class="mb-3">
+                                <label for="codeInput" class="form-label">Enter Verification Code</label>
+                                <input type="text" class="form-control" id="codeInput">
+                            </div>
+                            <button type="button" id="verifyCodeBtn" class="btn btn-primary">Verify Code</button>
+                            <button type="button" id="resendCodeBtn" class="btn btn-secondary ms-2">Resend Code</button>
+                        `);
+                        sessionStorage.setItem('email', email);
+                        sessionStorage.setItem('town', town);
+                    } else {
+                        $('#divMessage').removeClass('alert-info').addClass('alert-danger').text(response.message);
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error sending verification code:', status, error);
+                    $('#divMessage').removeClass('alert-info').addClass('alert-danger').text('Error sending verification code.');
+                }
+            });
+        });
+
+        $(document).on('click', '#verifyCodeBtn', function() {
+            const code = $('#codeInput').val();
+            if (!code) {
+                $('#divMessage').removeClass('alert-info').addClass('alert-danger').text('Please enter the verification code.');
+                return;
+            }
+            $.ajax({
+                url: 'ajax/verifyCode.php',
+                type: 'POST',
+                data: { code },
+                dataType: 'json',
+                success: function(response) {
+                    console.log('verifyCode response:', response);
+                    if (response.success) {
+                        $('#divMessage').removeClass('alert-danger').addClass('alert-success').text('Authentication successful.');
+                        showInputOptions();
+                    } else {
+                        $('#divMessage').removeClass('alert-info').addClass('alert-danger').text(response.message);
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error verifying code:', status, error);
+                    $('#divMessage').removeClass('alert-info').addClass('alert-danger').text('Error verifying code.');
+                }
+            });
+        });
+
+        $(document).on('click', '#resendCodeBtn', function() {
+            const email = sessionStorage.getItem('email');
+            const town = sessionStorage.getItem('town');
+            if (!email || !town) {
+                $('#divMessage').removeClass('alert-info').addClass('alert-danger').text('Email or town missing for resending code.');
+                return;
+            }
+            $.ajax({
+                url: 'ajax/sendVerificationCode.php',
+                type: 'POST',
+                data: { email, town },
+                dataType: 'json',
+                success: function(response) {
+                    console.log('resendCode response:', response);
+                    if (response.success) {
+                        $('#divMessage').removeClass('alert-danger').addClass('alert-info').text('Verification code resent. Please check your email.');
+                    } else {
+                        $('#divMessage').removeClass('alert-info').addClass('alert-danger').text(response.message);
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error resending code:', status, error);
+                    $('#divMessage').removeClass('alert-info').addClass('alert-danger').text('Error resending verification code.');
+                }
+            });
+        });
+
+        // Manual Entry
+        $(document).on('click', '#manualEntryBtn', function() {
+            console.log('Manual Entry button clicked');
+            isEditingExisting = false;
+            selectedHeaderId = null;
+            tableData = [];
+            newRowData = { checked: true };
+            renderTable();
+            validateAndToggleSubmitButton();
+        });
+
+        // Upload File
+        $(document).on('click', '#uploadFileBtn', function() {
+            console.log('Upload File button clicked');
+            $('#divMessage').removeClass('alert-danger').addClass('alert-info').text('Select a CSV file to upload.');
+            $('#divUserInput').html(`
+                <div class="mb-3">
+                    <label for="fileInput" class="form-label">Upload CSV File</label>
+                    <input type="file" class="form-control" id="fileInput" accept=".csv">
+                </div>
+                <button type="button" id="processFileBtn" class="btn btn-primary">Process File</button>
+                <button type="button" class="btn btn-secondary ms-2" onclick="showInputOptions()">Back to Input Options</button>
+            `);
+        });
+
+        $(document).on('click', '#processFileBtn', function() {
+            console.log('Process File button clicked');
+            const fileInput = $('#fileInput')[0];
+            if (!fileInput.files.length) {
+                $('#divMessage').removeClass('alert-info').addClass('alert-danger').text('Please select a CSV file.');
+                return;
+            }
+            const file = fileInput.files[0];
+            const formData = new FormData();
+            formData.append('file', file);
+
+            $.ajax({
+                url: 'ajax/uploadFile.php',
+                type: 'POST',
+                data: formData,
+                processData: false,
+                contentType: false,
+                dataType: 'json',
+                success: function(response) {
+                    console.log('uploadFile response:', response);
+                    if (response.success) {
+                        tableData = response.data.map(row => autoAssignStandards({
+                            1: row[0] || '',
+                            2: row[1] || '',
+                            3: row[2] || '',
+                            4: row[3] || '',
+                            5: row[4] || '',
+                            checked: true,
+                            standardDeptID: null,
+                            standardJobClassID: null
+                        }));
+                        newRowData = { checked: true };
+                        renderTable();
+                        $('#divMessage').removeClass('alert-danger').addClass('alert-success').text('File processed successfully. Review and map standard values.');
+                        validateAndToggleSubmitButton();
+                    } else {
+                        $('#divMessage').removeClass('alert-info').addClass('alert-danger').text(response.message);
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error uploading file:', status, error);
+                    $('#divMessage').removeClass('alert-info').addClass('alert-danger').text('Error processing file.');
+                }
+            });
+        });
+
+        // Copy and Paste
+        $(document).on('click', '#copyPasteBtn', function() {
+            console.log('Copy and Paste button clicked');
+            $('#divMessage').removeClass('alert-danger').addClass('alert-info').text('Paste your CSV data below.');
+            $('#divUserInput').html(`
+                <div class="mb-3">
+                    <label for="pasteInput" class="form-label">Paste CSV Data</label>
+                    <textarea class="form-control" id="pasteInput" rows="5"></textarea>
+                </div>
+                <button type="button" id="processPasteBtn" class="btn btn-primary">Process Data</button>
+                <button type="button" class="btn btn-secondary ms-2" onclick="showInputOptions()">Back to Input Options</button>
+            `);
+        });
+
+        $(document).on('click', '#processPasteBtn', function() {
+            console.log('Process Paste button clicked');
+            const pasteData = $('#pasteInput').val().trim();
+            if (!pasteData) {
+                $('#divMessage').removeClass('alert-info').addClass('alert-danger').text('Please paste CSV data.');
+                return;
+            }
+            const rows = pasteData.split('\n').filter(row => row.trim() !== '');
+            tableData = [];
+            let hasErrors = false;
+
+            rows.forEach((row, index) => {
+                const cols = parseCSVRow(row, ',');
+                if (cols.length !== 5) {
+                    hasErrors = true;
+                    $('#divMessage').removeClass('alert-info').addClass('alert-danger').text(`Invalid number of columns in row ${index + 1}. Expected 5 columns.`);
+                    return;
+                }
+                for (let i = 2; i < 5; i++) {
+                    const value = cols[i].replace(/[\$,]/g, '');
+                    if (value && isNaN(value)) {
+                        hasErrors = true;
+                        $('#divMessage').removeClass('alert-info').addClass('alert-danger').text(`Invalid numeric value in row ${index + 1}, column ${columns[i].name}.`);
+                        return;
+                    }
+                }
+                if (!hasErrors) {
+                    tableData.push(autoAssignStandards({
+                        1: cols[0] || '',
+                        2: cols[1] || '',
+                        3: cols[2] || '',
+                        4: cols[3] || '',
+                        5: cols[4] || '',
+                        checked: true,
+                        standardDeptID: null,
+                        standardJobClassID: null
+                    }));
+                }
+            });
+
+            if (!hasErrors) {
+                newRowData = { checked: true };
+                renderTable();
+                $('#divMessage').removeClass('alert-danger').addClass('alert-success').text('Data processed successfully. Review and map standard values.');
+                validateAndToggleSubmitButton();
+            }
+        });
+
+        // Edit Existing Data
+        $(document).on('click', '#editExistingBtn', function() {
+            console.log('Edit Existing Data button clicked');
+            isEditingExisting = true;
+            $.ajax({
+                url: 'ajax/checkExistingData.php',
+                type: 'GET',
+                dataType: 'json',
+                success: function(response) {
+                    console.log('checkExistingData response:', response);
+                    if (response.success && response.hasData) {
+                        const headers = response.headers;
+                        const email = response.email;
+                        const town = response.town;
+                        let options = headers.map(header => 
+                            `<option value="${header.id}">${header.uploadDate || 'No Date'}</option>`
+                        ).join('');
+                        $('#divMessage').removeClass('alert-danger').addClass('alert-info').text('Select a dataset to edit.');
+                        $('#divUserInput').html(`
+                            <div class="mb-3">
+                                <label for="headerSelect" class="form-label">Select Dataset (Uploaded On)</label>
+                                <select class="form-control" id="headerSelect">
+                                    <option value="">-- Select a dataset --</option>
+                                    ${options}
+                                </select>
+                            </div>
+                            <button type="button" id="loadHeaderDataBtn" class="btn btn-primary">Load Data</button>
+                            <button type="button" class="btn btn-secondary ms-2" onclick="showInputOptions()">Back to Input Options</button>
+                        `);
+                    } else {
+                        $('#divMessage').removeClass('alert-info').addClass('alert-danger').text(response.message);
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error retrieving existing data:', status, error);
+                    $('#divMessage').removeClass('alert-info').addClass('alert-danger').text('Error retrieving existing data.');
+                }
+            });
+        });
+
+        $(document).on('click', '#loadHeaderDataBtn', function() {
+            console.log('Load Header Data button clicked');
+            const headerId = $('#headerSelect').val();
+            if (!headerId) {
+                $('#divMessage').removeClass('alert-info').addClass('alert-danger').text('Please select a dataset to edit.');
+                return;
+            }
+            selectedHeaderId = headerId;
+            $.ajax({
+                url: 'ajax/loadDetailData.php',
+                type: 'POST',
+                data: { headerId },
+                dataType: 'json',
+                success: function(response) {
+                    console.log('loadDetailData response:', response);
+                    if (response.success) {
+                        tableData = response.data;
+                        newRowData = { checked: true };
+                        renderTable();
+                        $('#divMessage').removeClass('alert-danger').addClass('alert-success').text('Data loaded successfully.');
+                        validateAndToggleSubmitButton();
+                    } else {
+                        $('#divMessage').removeClass('alert-info').addClass('alert-danger').text(response.message);
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error loading dataset:', status, error);
+                    $('#divMessage').removeClass('alert-info').addClass('alert-danger').text('Error loading dataset.');
+                }
+            });
+        });
+
+        $(document).on('change', '#selectAll', function() {
+            const checked = $(this).prop('checked');
+            $('.row-checkbox').prop('checked', checked).each(function() {
+                const index = $(this).data('index');
+                if (tableData[index]) {
+                    tableData[index].checked = checked;
+                    $(this).closest('tr').toggleClass('checked-row', checked).toggleClass('unchecked-row', !checked);
+                    $(this).closest('tr').find('.editable-cell').each(function() {
+                        const column = $(this).data('column');
+                        const value = tableData[index][column] || '';
+                        $(this).toggleClass('blank-cell', checked && (!value || value.trim() === ''));
+                    });
+                }
+            });
+            validateAndToggleSubmitButton();
+        });
+
+        $(document).on('change', '.row-checkbox', function() {
+            const index = $(this).data('index');
+            if (tableData[index]) {
+                tableData[index].checked = $(this).prop('checked');
+                $(this).closest('tr').toggleClass('checked-row', tableData[index].checked).toggleClass('unchecked-row', !tableData[index].checked);
+                $(this).closest('tr').find('.editable-cell').each(function() {
+                    const column = $(this).data('column');
+                    const value = tableData[index][column] || '';
+                    $(this).toggleClass('blank-cell', tableData[index].checked && (!value || value.trim() === ''));
+                });
+                updateSelectAll();
+                validateAndToggleSubmitButton();
+            }
+        });
+
+        function updateSelectAll() {
+            const allChecked = $('.row-checkbox').length === $('.row-checkbox:checked').length;
+            $('#selectAll').prop('checked', allChecked);
+        }
+
+        $(document).on('blur', '.editable-cell:not(.new-row)', function() {
+            const index = $(this).data('index');
+            const column = $(this).data('column');
+            const value = $(this).text().trim();
+            if (index !== undefined && tableData[index]) {
+                if ((column >= 3 && !isNaN(value) && value !== '') || (column < 3)) {
+                    tableData[index][column] = value;
+                    $(this).removeClass('blank-cell');
+                    if (tableData[index].checked && (!value || value.trim() === '')) {
+                        $(this).addClass('blank-cell');
+                    }
+                    if (column <= 2) {
+                        tableData[index] = autoAssignStandards(tableData[index]);
+                        renderTable();
+                    }
+                } else if (column >= 3) {
+                    $(this).text(tableData[index][column] || '');
+                    alert('Please enter a numeric value for ' + columns.find(c => c.id == column).name);
+                }
+            }
+            validateAndToggleSubmitButton();
+        });
+
+        $(document).on('change', '.standard-dept', function() {
+            const index = $(this).data('index');
+            const value = $(this).val();
+            console.log('Standard Dept changed:', { index, value });
+            if (index !== undefined && tableData[index]) {
+                tableData[index].standardDeptID = value ? parseInt(value) : null;
+                tableData[index].standardJobClassID = null; // Reset job class
+            } else {
+                newRowData.standardDeptID = value ? parseInt(value) : null;
+                newRowData.standardJobClassID = null;
+            }
+            renderTable();
+            validateAndToggleSubmitButton();
+        });
+
+        $(document).on('change', '.standard-job', function() {
+            const index = $(this).data('index');
+            const value = $(this).val();
+            console.log('Standard Job changed:', { index, value });
+            if (index !== undefined && tableData[index]) {
+                tableData[index].standardJobClassID = value ? parseInt(value) : null;
+            } else {
+                newRowData.standardJobClassID = value ? parseInt(value) : null;
+            }
+            validateAndToggleSubmitButton();
+        });
+
+        $(document).on('input', '.new-row.editable-cell', function() {
+            const column = $(this).data('column');
+            const value = $(this).text().trim();
+            console.log('Input in column:', column, 'value:', value);
+            if ((column >= 3 && !isNaN(value) && value !== '') || (column < 3)) {
+                newRowData[column] = value;
+                $(this).removeClass('blank-cell');
+                if (!value || value.trim() === '') {
+                    newRowData[column] = '';
+                    $(this).addClass('blank-cell');
+                }
+                if (column <= 2) {
+                    newRowData = autoAssignStandards(newRowData);
+                    renderTable();
+                }
+            } else if (column >= 3 && value !== '') {
+                $(this).text('');
+                newRowData[column] = '';
+                alert('Please enter a numeric value for ' + columns.find(c => c.id == column).name);
+                $(this).addClass('blank-cell');
+                return;
+            }
+            console.log('newRowData:', newRowData);
+            let allFilled = true;
+            let isValid = true;
+            for (let i = 1; i <= 5; i++) {
+                const val = newRowData[i] || '';
+                if (!val || val.trim() === '') {
+                    allFilled = false;
+                }
+                if (i >= 3 && val && isNaN(val)) {
+                    isValid = false;
+                }
+            }
+            if (allFilled && isValid) {
+                console.log('Committing newRowData to tableData:', { ...newRowData });
+                const newRowIndex = tableData.length;
+                tableData.push({ ...newRowData });
+                newRowData = { checked: true };
+                renderTable();
+                const newCell = $(`.editable-cell[data-index="${newRowIndex}"][data-column="${column}"]`);
+                if (newCell.length) {
+                    newCell.focus();
+                    const range = document.createRange();
+                    const sel = window.getSelection();
+                    range.selectNodeContents(newCell[0]);
+                    range.collapse(false);
+                    sel.removeAllRanges();
+                    sel.addRange(range);
+                }
+                $('.new-row.editable-cell').each(function() {
+                    const col = $(this).data('column');
+                    $(this).toggleClass('blank-cell', !newRowData[col] || newRowData[col].trim() === '');
+                });
+            }
+            validateAndToggleSubmitButton();
+        });
+
+        $(document).on('keydown', '.new-row.editable-cell', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                const column = $(this).data('column');
+                let hasData = false;
+                let isValid = true;
+                $('.new-row.editable-cell').each(function() {
+                    const col = $(this).data('column');
+                    const value = $(this).text().trim();
+                    if (value) {
+                        hasData = true;
+                        if (col >= 3 && isNaN(value)) {
+                            isValid = false;
+                            alert('Please enter a numeric value for ' + columns.find(c => c.id == col).name);
+                            $(this).text('');
+                            newRowData[col] = '';
+                            $(this).addClass('blank-cell');
+                        } else {
+                            newRowData[col] = value;
+                        }
+                    } else {
+                        newRowData[col] = '';
+                        $(this).addClass('blank-cell');
+                    }
+                });
+                if (hasData && isValid) {
+                    console.log('Enter key: Committing newRowData to tableData:', { ...newRowData });
+                    newRowData = autoAssignStandards(newRowData);
+                    const newRowIndex = tableData.length;
+                    tableData.push({ ...newRowData });
+                    newRowData = { checked: true };
+                    renderTable();
+                    const newCell = $(`.editable-cell[data-index="${newRowIndex}"][data-column="${column}"]`);
+                    if (newCell.length) {
+                        newCell.focus();
+                        const range = document.createRange();
+                        const sel = window.getSelection();
+                        range.selectNodeContents(newCell[0]);
+                        range.collapse(false);
+                        sel.removeAllRanges();
+                        sel.addRange(range);
+                    }
+                    $('.new-row.editable-cell').each(function() {
+                        const col = $(this).data('column');
+                        $(this).toggleClass('blank-cell', !newRowData[col] || newRowData[col].trim() === '');
+                    });
+                }
+                validateAndToggleSubmitButton();
+            }
+        });
+
+        $(document).on('click', '#submitDataBtn', function() {
+            console.log('Submit Data button clicked');
+            if (!tableData.length) {
+                $('#divMessage').removeClass('alert-info').addClass('alert-danger').text('No data to submit.');
+                return;
+            }
+            for (let row of tableData) {
+                if (!row.hasOwnProperty('checked')) {
+                    $('#divMessage').removeClass('alert-info').addClass('alert-danger').text('Invalid data: Missing checked property.');
+                    return;
+                }
+                for (let i = 1; i <= 5; i++) {
+                    if (row.checked && (!row[i] || row[i].trim() === '')) {
+                        $('#divMessage').removeClass('alert-info').addClass('alert-danger').text(`Missing value in column ${columns.find(c => c.id == i).name} for a checked row.`);
+                        return;
+                    }
+                    if (row[i] && i >= 3 && isNaN(row[i])) {
+                        $('#divMessage').removeClass('alert-info').addClass('alert-danger').text(`Invalid numeric value in column ${i}.`);
+                        return;
+                    }
+                }
+            }
+            const url = isEditingExisting ? 'ajax/updateData.php' : 'ajax/submitData.php';
+            const dataToSend = isEditingExisting ? { headerId: selectedHeaderId, data: tableData } : tableData;
+            console.log('Submitting to:', url);
+            console.log('Data to send:', JSON.stringify(dataToSend, null, 2));
+            $.ajax({
+                url: url,
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify(dataToSend),
+                dataType: 'json',
+                success: function(response) {
+                    console.log('Submit response:', response);
+                    if (response.success) {
+                        $('#divMessage').removeClass('alert-danger').addClass('alert-success').text(response.message);
+                        tableData = [];
+                        newRowData = { checked: true };
+                        renderTable();
+                        showInputOptions();
+                    } else {
+                        $('#divMessage').removeClass('alert-info').addClass('alert-danger').text(response.message);
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error submitting data:', status, error);
+                    $('#divMessage').removeClass('alert-info').addClass('alert-danger').text('An error occurred. Please try again.');
+                }
+            });
+        });
+
+        function showInputOptions() {
+            $.ajax({
+                url: 'ajax/checkExistingData.php',
+                type: 'GET',
+                dataType: 'json',
+                success: function(response) {
+                    console.log('checkExistingData response:', response);
+                    if (response.success) {
+                        const hasData = response.hasData;
+                        $('#divMessage').removeClass('alert-danger').addClass('alert-info').text('Choose a data entry method.');
+                        $('#divUserInput').html(`
+                            <div class="mb-3">
+                                <button type="button" id="manualEntryBtn" class="btn btn-primary me-2">Manual Entry</button>
+                                <button type="button" id="uploadFileBtn" class="btn btn-primary me-2">Upload File</button>
+                                <button type="button" id="copyPasteBtn" class="btn btn-primary me-2">Copy and Paste</button>
+                                <button type="button" id="editExistingBtn" class="btn btn-primary" ${hasData ? '' : 'disabled'}>Edit Existing Data</button>
+                            </div>
+                        `);
+                    } else {
+                        $('#divMessage').removeClass('alert-info').addClass('alert-danger').text(response.message);
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error checking existing data:', status, error);
+                    $('#divMessage').removeClass('alert-info').addClass('alert-danger').text('Error checking for existing data.');
+                }
+            });
+        }
+    });
+</script>
+</body>
+</html>
