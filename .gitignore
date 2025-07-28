@@ -1,4 +1,4 @@
-../includes/db.php
+includes/
 uploads/ 
 vendor/ 
 vendor_backup/ 
