@@ -1,0 +1,35 @@
+Name	Owner	Type	Created_datetime
+tblDepartmentJobMapping	dbo	user table	2025-07-16 11:56:08.810
+
+Column_name	Type	Computed	Length	Prec	Scale	Nullable	TrimTrailingBlanks	FixedLenNullInSource	Collation
+id	int	no	4	10   	0    	no	(n/a)	(n/a)	NULL
+HeaderID	int	no	4	10   	0    	no	(n/a)	(n/a)	NULL
+OriginalDeptDesc	nvarchar	no	200	     	     	yes	(n/a)	(n/a)	SQL_Latin1_General_CP1_CI_AS
+StandardDeptID	int	no	4	10   	0    	yes	(n/a)	(n/a)	NULL
+OriginalJobClassDesc	nvarchar	no	200	     	     	yes	(n/a)	(n/a)	SQL_Latin1_General_CP1_CI_AS
+StandardJobClassID	int	no	4	10   	0    	yes	(n/a)	(n/a)	NULL
+
+Identity	Seed	Increment	Not For Replication
+id	1	1	0
+
+RowGuidCol
+No rowguidcol column defined.
+
+Data_located_on_filegroup
+PRIMARY
+
+index_name	index_description	index_keys
+PK__tblDepar__3213E83F8FDC8BF7	clustered, unique, primary key located on PRIMARY	id
+
+constraint_type	constraint_name	delete_action	update_action	status_enabled	status_for_replication	constraint_keys
+FOREIGN KEY	FK__tblDepart__Heade__75A278F5	No Action	No Action	Enabled	Is_For_Replication	HeaderID
+ 	 	 	 	 	 	REFERENCES MarketBasket.dbo.tblSalaryHeader (id)
+FOREIGN KEY	FK__tblDepart__Stand__76969D2E	No Action	No Action	Enabled	Is_For_Replication	StandardDeptID
+ 	 	 	 	 	 	REFERENCES MarketBasket.dbo.tblStandardDepartments (id)
+FOREIGN KEY	FK__tblDepart__Stand__778AC167	No Action	No Action	Enabled	Is_For_Replication	StandardJobClassID
+ 	 	 	 	 	 	REFERENCES MarketBasket.dbo.tblStandardJobClasses (id)
+FOREIGN KEY	FK_StandardDeptID	No Action	Cascade	Enabled	Is_For_Replication	StandardDeptID
+ 	 	 	 	 	 	REFERENCES MarketBasket.dbo.tblStandardDepartments (id)
+FOREIGN KEY	FK_StandardJobClassID	No Action	Cascade	Enabled	Is_For_Replication	StandardJobClassID
+ 	 	 	 	 	 	REFERENCES MarketBasket.dbo.tblStandardJobClasses (id)
+PRIMARY KEY (clustered)	PK__tblDepar__3213E83F8FDC8BF7	(n/a)	(n/a)	(n/a)	(n/a)	id

@@ -1,0 +1,27 @@
+Name	Owner	Type	Created_datetime
+tblSecurityCodes	dbo	user table	2025-05-01 11:50:29.980
+
+Column_name	Type	Computed	Length	Prec	Scale	Nullable	TrimTrailingBlanks	FixedLenNullInSource	Collation
+id	int	no	4	10   	0    	no	(n/a)	(n/a)	NULL
+registrationid	int	no	4	10   	0    	no	(n/a)	(n/a)	NULL
+code	varchar	no	6	     	     	no	no	no	SQL_Latin1_General_CP1_CI_AS
+expiry	datetime	no	8	     	     	no	(n/a)	(n/a)	NULL
+verifiedDate	datetime	no	8	     	     	yes	(n/a)	(n/a)	NULL
+
+Identity	Seed	Increment	Not For Replication
+id	1	1	0
+
+RowGuidCol
+No rowguidcol column defined.
+
+Data_located_on_filegroup
+PRIMARY
+
+index_name	index_description	index_keys
+PK__tblSecur__3213E83F5C7D8BD2	clustered, unique, primary key located on PRIMARY	id
+
+constraint_type	constraint_name	delete_action	update_action	status_enabled	status_for_replication	constraint_keys
+FOREIGN KEY	FK_tblSecurityCodes_tblRegistration	No Action	No Action	Enabled	Is_For_Replication	registrationid
+ 	 	 	 	 	 	REFERENCES MarketBasket.dbo.tblRegistration (id)
+PRIMARY KEY (clustered)	PK__tblSecur__3213E83F5C7D8BD2	(n/a)	(n/a)	(n/a)	(n/a)	id
+

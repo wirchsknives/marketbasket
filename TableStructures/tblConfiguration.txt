@@ -1,0 +1,24 @@
+Name	Owner	Type	Created_datetime
+tblConfiguration	dbo	user table	2025-04-30 13:22:45.970
+
+Column_name	Type	Computed	Length	Prec	Scale	Nullable	TrimTrailingBlanks	FixedLenNullInSource	Collation
+id	int	no	4	10   	0    	no	(n/a)	(n/a)	NULL
+parameter	varchar	no	200	     	     	yes	no	yes	SQL_Latin1_General_CP1_CI_AS
+parameter2	varchar	no	200	     	     	yes	no	yes	SQL_Latin1_General_CP1_CI_AS
+value	varchar	no	200	     	     	yes	no	yes	SQL_Latin1_General_CP1_CI_AS
+value2	varchar	no	200	     	     	yes	no	yes	SQL_Latin1_General_CP1_CI_AS
+
+Identity	Seed	Increment	Not For Replication
+id	1	1	0
+
+RowGuidCol
+No rowguidcol column defined.
+
+Data_located_on_filegroup
+PRIMARY
+
+index_name	index_description	index_keys
+PK__tblConfi__3213E83F806D4707	clustered, unique, primary key located on PRIMARY	id
+
+constraint_type	constraint_name	delete_action	update_action	status_enabled	status_for_replication	constraint_keys
+PRIMARY KEY (clustered)	PK__tblConfi__3213E83F806D4707	(n/a)	(n/a)	(n/a)	(n/a)	id

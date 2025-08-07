@@ -1,0 +1,32 @@
+Name	Owner	Type	Created_datetime
+tblRegistration	dbo	user table	2025-04-30 13:22:45.963
+
+Column_name	Type	Computed	Length	Prec	Scale	Nullable	TrimTrailingBlanks	FixedLenNullInSource	Collation
+id	int	no	4	10   	0    	no	(n/a)	(n/a)	NULL
+Email	varchar	no	255	     	     	no	no	no	SQL_Latin1_General_CP1_CI_AS
+Town	varchar	no	200	     	     	no	no	no	SQL_Latin1_General_CP1_CI_AS
+Note	text	no	16	     	     	yes	(n/a)	(n/a)	SQL_Latin1_General_CP1_CI_AS
+RegistrationDate	datetime	no	8	     	     	yes	(n/a)	(n/a)	NULL
+Approved	bit	no	1	     	     	yes	(n/a)	(n/a)	NULL
+ApprovedDate	datetime	no	8	     	     	yes	(n/a)	(n/a)	NULL
+
+Identity	Seed	Increment	Not For Replication
+id	1	1	0
+
+RowGuidCol
+No rowguidcol column defined.
+
+Data_located_on_filegroup
+PRIMARY
+
+index_name	index_description	index_keys
+PK__tblRegis__3213E83F7F31D818	clustered, unique, primary key located on PRIMARY	id
+
+constraint_type	constraint_name	delete_action	update_action	status_enabled	status_for_replication	constraint_keys
+DEFAULT on column Approved	DF__tblRegist__Appro__38996AB5	(n/a)	(n/a)	(n/a)	(n/a)	((0))
+DEFAULT on column RegistrationDate	DF__tblRegist__Regis__37A5467C	(n/a)	(n/a)	(n/a)	(n/a)	(getdate())
+PRIMARY KEY (clustered)	PK__tblRegis__3213E83F7F31D818	(n/a)	(n/a)	(n/a)	(n/a)	id
+
+Table is referenced by foreign key
+MarketBasket.dbo.tblSecurityCodes: FK_tblSecurityCodes_tblRegistration
+

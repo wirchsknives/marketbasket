@@ -1,0 +1,28 @@
+Name	Owner	Type	Created_datetime
+tblSalaryHeader	dbo	user table	2025-04-30 15:52:26.547
+
+Column_name	Type	Computed	Length	Prec	Scale	Nullable	TrimTrailingBlanks	FixedLenNullInSource	Collation
+id	int	no	4	10   	0    	no	(n/a)	(n/a)	NULL
+email	varchar	no	255	     	     	no	no	no	SQL_Latin1_General_CP1_CI_AS
+town	varchar	no	100	     	     	no	no	no	SQL_Latin1_General_CP1_CI_AS
+uploadDate	datetime	no	8	     	     	yes	(n/a)	(n/a)	NULL
+
+Identity	Seed	Increment	Not For Replication
+id	1	1	0
+
+RowGuidCol
+No rowguidcol column defined.
+
+Data_located_on_filegroup
+PRIMARY
+
+index_name	index_description	index_keys
+PK__tblSalar__3213E83F11C157FF	clustered, unique, primary key located on PRIMARY	id
+
+constraint_type	constraint_name	delete_action	update_action	status_enabled	status_for_replication	constraint_keys
+DEFAULT on column uploadDate	DF__tblSalary__uploa__440B1D61	(n/a)	(n/a)	(n/a)	(n/a)	(getdate())
+PRIMARY KEY (clustered)	PK__tblSalar__3213E83F11C157FF	(n/a)	(n/a)	(n/a)	(n/a)	id
+
+Table is referenced by foreign key
+MarketBasket.dbo.tblDepartmentJobMapping: FK__tblDepart__Heade__75A278F5
+MarketBasket.dbo.tblSalaryDetail: FK_tblSalaryDetail_tblSalaryHeader

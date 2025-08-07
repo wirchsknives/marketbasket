@@ -1,0 +1,18 @@
+Name	Owner	Type	Created_datetime
+tblColumns	dbo	user table	2025-05-01 08:13:54.283
+
+Column_name	Type	Computed	Length	Prec	Scale	Nullable	TrimTrailingBlanks	FixedLenNullInSource	Collation
+id	int	no	4	10   	0    	no	(n/a)	(n/a)	NULL
+Description	varchar	no	100	     	     	no	no	no	SQL_Latin1_General_CP1_CI_AS
+
+RowGuidCol
+No rowguidcol column defined.
+
+Data_located_on_filegroup
+PRIMARY
+
+index_name	index_description	index_keys
+PK__tblColum__3213E83FF5703EB5	clustered, unique, primary key located on PRIMARY	id
+
+constraint_type	constraint_name	delete_action	update_action	status_enabled	status_for_replication	constraint_keys
+PRIMARY KEY (clustered)	PK__tblColum__3213E83FF5703EB5	(n/a)	(n/a)	(n/a)	(n/a)	id

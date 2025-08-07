@@ -1,0 +1,36 @@
+Name	Owner	Type	Created_datetime
+tblStandardDepartments	dbo	user table	2025-07-16 11:56:08.800
+
+Column_name	Type	Computed	Length	Prec	Scale	Nullable	TrimTrailingBlanks	FixedLenNullInSource	Collation
+id	int	no	4	10   	0    	no	(n/a)	(n/a)	NULL
+StandardDeptDesc	nvarchar	no	200	     	     	no	(n/a)	(n/a)	SQL_Latin1_General_CP1_CI_AS
+Deleted	bit	no	1	     	     	no	(n/a)	(n/a)	NULL
+
+Identity	Seed	Increment	Not For Replication
+id	1	1	0
+
+Identity	Seed	Increment	Not For Replication
+id	1	1	0
+
+RowGuidCol
+No rowguidcol column defined.
+
+Data_located_on_filegroup
+PRIMARY
+
+index_name	index_description	index_keys
+IX_StandardDeptDesc	nonclustered located on PRIMARY	StandardDeptDesc
+PK__tblStand__3213E83F3F864F9E	clustered, unique, primary key located on PRIMARY	id
+UQ__tblStand__6BC1C585319922AB	nonclustered, unique, unique key located on PRIMARY	StandardDeptDesc
+
+constraint_type	constraint_name	delete_action	update_action	status_enabled	status_for_replication	constraint_keys
+DEFAULT on column Deleted	DF__tblStanda__Delet__7A672E12	(n/a)	(n/a)	(n/a)	(n/a)	((0))
+PRIMARY KEY (clustered)	PK__tblStand__3213E83F3F864F9E	(n/a)	(n/a)	(n/a)	(n/a)	id
+UNIQUE (non-clustered)	UQ__tblStand__6BC1C585319922AB	(n/a)	(n/a)	(n/a)	(n/a)	StandardDeptDesc
+
+Table is referenced by foreign key
+MarketBasket.dbo.tblDepartmentJobMapping: FK__tblDepart__Stand__76969D2E
+MarketBasket.dbo.tblDepartmentJobMapping: FK_StandardDeptID
+MarketBasket.dbo.tblSalaryDetail: FK__tblSalary__Stand__787EE5A0
+MarketBasket.dbo.tblSalaryDetail: FK_SalaryDetail_StandardDeptID
+MarketBasket.dbo.tblStandardJobClasses: FK_StandardJobClasses_StandardDeptID
