@@ -1,0 +1,9 @@
+Column_name	Type	Computed	Length	Prec	Scale	Nullable	TrimTrailingBlanks	FixedLenNullInSource	Collation
+id	int	no	4	10   	0    	no	(n/a)	(n/a)	NULL
+headerid	int	no	4	10   	0    	no	(n/a)	(n/a)	NULL
+DataType	varchar	no	250	     	     	no	no	no	SQL_Latin1_General_CP1_CI_AS
+DataValue	nvarchar	no	510	     	     	yes	(n/a)	(n/a)	SQL_Latin1_General_CP1_CI_AS
+columnId	int	no	4	10   	0    	no	(n/a)	(n/a)	NULL
+rowID	int	no	4	10   	0    	yes	(n/a)	(n/a)	NULL
+StandardDeptID	int	no	4	10   	0    	yes	(n/a)	(n/a)	NULL
+StandardJobClassID	int	no	4	10   	0    	yes	(n/a)	(n/a)	NULL

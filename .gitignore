@@ -3,3 +3,5 @@ uploads/
 vendor/ 
 vendor_backup/ 
 vendorold/ 
+*.log
+*.tmp
