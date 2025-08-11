@@ -3,120 +3,124 @@ session_start();
 require_once '../includes/db.php';
 header('Content-Type: application/json');
 
-$response = [
-    'success' => false,
-    'message' => 'Not authenticated or session expired.'
-];
-
 if (!isset($_SESSION['authenticated']) || !$_SESSION['authenticated'] || time() > $_SESSION['session_expiry']) {
-    echo json_encode($response);
+    echo json_encode(['success' => false, 'message' => 'Not authenticated or session expired.']);
     exit;
 }
 
-$input = json_decode(file_get_contents('php://input'), true);
-if (!$input || !isset($input['headerId']) || !is_array($input['data'])) {
-    $response['message'] = 'Invalid or missing data.';
-    echo json_encode($response);
+if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !isset($_POST['headerId']) || !isset($_POST['data'])) {
+    error_log("updateData.php REQUEST_METHOD:".$_SERVER['REQUEST_METHOD']." headerid:".isset($_POST['headerId'])." data:".isset($_POST['data']));
+    echo json_encode(['success' => false, 'message' => 'Invalid request or missing data.']);
     exit;
 }
 
 try {
-    $headerId = (int)$input['headerId'];
+    sqlsrv_begin_transaction($connSql);
 
-    // Verify header exists
-    $sql = "SELECT COUNT(*) AS count FROM tblSalaryHeader WHERE ID = ? AND Email = ?";
-    $params = [$headerId, $_SESSION['email']];
-    $stmt = sqlsrv_query($connSql, $sql, $params);
-    if ($stmt === false) {
-        throw new Exception('Error verifying header: ' . print_r(sqlsrv_errors(), true));
-    }
-    $row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC);
-    if ($row['count'] == 0) {
-        throw new Exception('Header not found or not authorized.');
-    }
-    sqlsrv_free_stmt($stmt);
+    // Verify tblSalaryHeader record
+    $headerId = intval($_POST['headerId']);
+    $queryHeader = "SELECT id FROM tblSalaryHeader WHERE id = ? AND email = ? AND town = ?";
+    $paramsHeader = [$headerId, $_SESSION['auth_email'], $_SESSION['auth_town']];
+    $stmtHeader = sqlsrv_query($connSql, $queryHeader, $paramsHeader);
 
-    // Begin transaction
-    if (!sqlsrv_begin_transaction($connSql)) {
-        throw new Exception('Error starting transaction: ' . print_r(sqlsrv_errors(), true));
+    if ($stmtHeader === false || sqlsrv_fetch($stmtHeader) === false) {
+        throw new Exception("Invalid header ID or no matching salary header record.");
+    }
+    sqlsrv_free_stmt($stmtHeader);
+
+    // Process and validate data for tblSalaryDetails
+    $data = json_decode($_POST['data'], true);
+    if (!is_array($data)) {
+        throw new Exception("Invalid data format.");
     }
 
-    // Delete existing details and mappings
-    $sql = "DELETE FROM tblSalaryDetail WHERE HeaderID = ?";
-    $stmt = sqlsrv_query($connSql, $sql, [$headerId]);
-    if ($stmt === false) {
-        sqlsrv_rollback($connSql);
-        throw new Exception('Error deleting existing details: ' . print_r(sqlsrv_errors(), true));
+    // Separate checked and unchecked rows
+    $existingRows = []; // Assume we fetch existing rows to compare
+    $queryExisting = "SELECT rowId, DepartmentCodeDesc, JobClassCodeDesc, ScheduledHours, HourlyRate, AnnualPay, Degree, StandardDeptID, StandardJobClassID, deleted 
+                      FROM tblSalaryDetails WHERE headerid = ?";
+    $stmtExisting = sqlsrv_query($connSql, $queryExisting, [$headerId]);
+    while ($row = sqlsrv_fetch_array($stmtExisting, SQLSRV_FETCH_ASSOC)) {
+        $existingRows[$row['rowId']] = $row;
     }
-    sqlsrv_free_stmt($stmt);
+    sqlsrv_free_stmt($stmtExisting);
 
-    $sql = "DELETE FROM tblDepartmentJobMapping WHERE HeaderID = ?";
-    $stmt = sqlsrv_query($connSql, $sql, [$headerId]);
-    if ($stmt === false) {
-        sqlsrv_rollback($connSql);
-        throw new Exception('Error deleting existing mappings: ' . print_r(sqlsrv_errors(), true));
-    }
-    sqlsrv_free_stmt($stmt);
-
-    // Insert updated data
-    foreach ($input['data'] as $row) {
-        if (!isset($row['checked']) || !$row['checked']) {
-            continue;
+    // Update existing rows to mark unchecked as deleted
+    foreach ($existingRows as $rowId => $row) {
+        $isChecked = false;
+        foreach ($data as $item) {
+            if (isset($item['rowId']) && $item['rowId'] == $rowId && isset($item['checked']) && $item['checked']) {
+                $isChecked = true;
+                break;
+            }
         }
-        $sql = "INSERT INTO tblSalaryDetail (
-            HeaderID, OriginalDeptDesc, OriginalJobClassDesc, 
-            ScheduledHours, HourlyRate, AnnualPay, 
-            StandardDeptID, StandardJobClassID
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
-        $params = [
-            $headerId,
-            $row[1] ?? null,
-            $row[2] ?? null,
-            isset($row[3]) ? floatval($row[3]) : null,
-            isset($row[4]) ? floatval($row[4]) : null,
-            isset($row[5]) ? floatval($row[5]) : null,
-            isset($row['standardDeptID']) ? (int)$row['standardDeptID'] : null,
-            isset($row['standardJobClassID']) ? (int)$row['standardJobClassID'] : null
-        ];
-        $stmt = sqlsrv_query($connSql, $sql, $params);
-        if ($stmt === false) {
-            sqlsrv_rollback($connSql);
-            throw new Exception('Error inserting detail: ' . print_r(sqlsrv_errors(), true));
+        if (!$isChecked && !$row['deleted']) { // Only update if not already deleted
+            $queryUpdate = "UPDATE tblSalaryDetails SET deleted = 1 WHERE headerid = ? AND rowId = ?";
+            $paramsUpdate = [$headerId, $rowId];
+            $stmtUpdate = sqlsrv_query($connSql, $queryUpdate, $paramsUpdate);
+            if ($stmtUpdate === false) {
+                throw new Exception("Error marking row as deleted: " . print_r(sqlsrv_errors(), true));
+            }
+            sqlsrv_free_stmt($stmtUpdate);
         }
-        sqlsrv_free_stmt($stmt);
-
-        $sql = "INSERT INTO tblDepartmentJobMapping (
-            HeaderID, OriginalDeptDesc, StandardDeptID, 
-            OriginalJobClassDesc, StandardJobClassID
-        ) VALUES (?, ?, ?, ?, ?)";
-        $params = [
-            $headerId,
-            $row[1] ?? null,
-            isset($row['standardDeptID']) ? (int)$row['standardDeptID'] : null,
-            $row[2] ?? null,
-            isset($row['standardJobClassID']) ? (int)$row['standardJobClassID'] : null
-        ];
-        $stmt = sqlsrv_query($connSql, $sql, $params);
-        if ($stmt === false) {
-            sqlsrv_rollback($connSql);
-            throw new Exception('Error inserting mapping: ' . print_r(sqlsrv_errors(), true));
-        }
-        sqlsrv_free_stmt($stmt);
     }
 
-    if (!sqlsrv_commit($connSql)) {
-        throw new Exception('Error committing transaction: ' . print_r(sqlsrv_errors(), true));
+    // Insert or update checked rows
+    foreach ($data as $item) {
+        if (isset($item['rowId']) && isset($item['checked']) && $item['checked']) {
+            $rowId = intval($item['rowId']);
+            $departmentCodeDesc = isset($item['DepartmentCodeDesc']) ? trim($item['DepartmentCodeDesc']) : '';
+            $jobClassCodeDesc = isset($item['JobClassCodeDesc']) ? trim($item['JobClassCodeDesc']) : '';
+            $scheduledHours = isset($item['ScheduledHours']) ? trim(preg_replace('/[\$,]/', '', $item['ScheduledHours'])) : '';
+            $hourlyRate = isset($item['HourlyRate']) ? trim(preg_replace('/[\$,]/', '', $item['HourlyRate'])) : '0.00';
+            $annualPay = isset($item['AnnualPay']) ? trim(preg_replace('/[\$,]/', '', $item['AnnualPay'])) : '0.00';
+            $degree = isset($item['Degree']) ? trim($item['Degree']) : '';
+            $standardDeptID = isset($item['StandardDeptID']) ? $item['StandardDeptID'] : null;
+            $standardJobClassID = isset($item['StandardJobClassID']) ? $item['StandardJobClassID'] : null;
+
+            if ($departmentCodeDesc === '' || $jobClassCodeDesc === '' || ($scheduledHours === '' && !is_numeric($scheduledHours))) {
+                throw new Exception("Missing or invalid required fields for row $rowId.");
+            }
+
+            $scheduledHours = floatval($scheduledHours);
+            $hourlyRate = floatval($hourlyRate);
+            $annualPay = floatval($annualPay);
+
+            // Check if row exists and update, otherwise insert
+            if (isset($existingRows[$rowId])) {
+                $queryUpdate = "UPDATE tblSalaryDetails 
+                                SET DepartmentCodeDesc = ?, JobClassCodeDesc = ?, ScheduledHours = ?, HourlyRate = ?, AnnualPay = ?, Degree = ?, StandardDeptID = ?, StandardJobClassID = ?, deleted = 0 
+                                WHERE headerid = ? AND rowId = ?";
+                $paramsUpdate = [$departmentCodeDesc, $jobClassCodeDesc, $scheduledHours, $hourlyRate, $annualPay, $degree, $standardDeptID, $standardJobClassID, $headerId, $rowId];
+                $stmtUpdate = sqlsrv_query($connSql, $queryUpdate, $paramsUpdate);
+                if ($stmtUpdate === false) {
+                    throw new Exception("Error updating row $rowId: " . print_r(sqlsrv_errors(), true));
+                }
+                sqlsrv_free_stmt($stmtUpdate);
+            } else {
+                $queryInsert = "INSERT INTO tblSalaryDetails (headerid, rowId, DepartmentCodeDesc, JobClassCodeDesc, ScheduledHours, HourlyRate, AnnualPay, Degree, StandardDeptID, StandardJobClassID, deleted) 
+                                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)";
+                $paramsInsert = [$headerId, $rowId, $departmentCodeDesc, $jobClassCodeDesc, $scheduledHours, $hourlyRate, $annualPay, $degree, $standardDeptID, $standardJobClassID];
+                $stmtInsert = sqlsrv_query($connSql, $queryInsert, $paramsInsert);
+                if ($stmtInsert === false) {
+                    throw new Exception("Error inserting row $rowId: " . print_r(sqlsrv_errors(), true));
+                }
+                sqlsrv_free_stmt($stmtInsert);
+            }
+        }
     }
 
-    $response['success'] = true;
-    $response['message'] = 'Data updated successfully.';
+    sqlsrv_commit($connSql);
+    echo json_encode(['success' => true, 'message' => 'Data updated successfully.']);
 } catch (Exception $e) {
     sqlsrv_rollback($connSql);
-    $response['message'] = 'Error: ' . $e->getMessage();
-    error_log('updateData error: ' . $e->getMessage());
+    echo json_encode(['success' => false, 'message' => 'Error updating data: ' . $e->getMessage()]);
 } finally {
+    if (isset($stmtHeader) || isset($stmtExisting) || isset($stmtUpdate) || isset($stmtInsert)) {
+        sqlsrv_free_stmt($stmtHeader);
+        sqlsrv_free_stmt($stmtExisting);
+        sqlsrv_free_stmt($stmtUpdate);
+        sqlsrv_free_stmt($stmtInsert);
+    }
     sqlsrv_close($connSql);
 }
-
-echo json_encode($response);
 ?>
