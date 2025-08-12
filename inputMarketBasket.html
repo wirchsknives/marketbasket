@@ -371,6 +371,7 @@ function renderTable(email = '', town = '') {
                 dataType: 'json',
                 success: function(response) {
                     if (response.success) {
+console.table(response.data);                        
                         tableData = response.data.map(row => ({ ...row, checked: true }));
                         newRowData = { checked: true }; // Reset new row data
                         renderTable(response.email, response.town);
@@ -498,9 +499,13 @@ function renderTable(email = '', town = '') {
                 dataType: 'json',
                 success: function(response) {
                     if (response.success) {
-                        tableData = response.data;
+                        //tableData = response.data;
+                        tableData = response.data.map(row => ({ ...row, checked: true }));
                         newRowData = { checked: true }; // Reset new row data
-                        console.log('Got back from loadDetailData. here is the table:', tableData);
+                        console.log('Got back from loadDetailData. for header:'+headerId);
+                        console.log('Got back from loadDetailData. here is the table:');
+                        console.table(tableData);
+                        console.log('Got back from loadDetailData. for header:'+headerId);
                         renderTable();
                         validateAndToggleSubmitButton();
                     } else {

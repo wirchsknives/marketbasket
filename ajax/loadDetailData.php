@@ -17,9 +17,9 @@ try {
     $headerId = intval($_POST['headerId']);
 
     // Select data from tblSalaryDetails
-    $query = "SELECT id, DepartmentCodeDesc, JobClassCodeDesc, ScheduledHours, HourlyRate, AnnualPay 
+    $query = "SELECT id, DepartmentCodeDesc, JobClassCodeDesc, ScheduledHours, HourlyRate, AnnualPay, Degree, StandardDeptID, StandardJobClassID, deleted  
               FROM tblSalaryDetails 
-              WHERE headerid = ? AND deleted = 0";
+              WHERE headerid = ?";
     $params = array($headerId);
     $stmt = sqlsrv_query($connSql, $query, $params);
 
@@ -29,16 +29,21 @@ try {
 
     $data = array();
     while ($row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) {
+error_log("loadDetailData.php department:".$row['DepartmentCodeDesc']);      
         $data[] = [
             1 => $row['DepartmentCodeDesc'],
             2 => $row['JobClassCodeDesc'],
             3 => (string)$row['ScheduledHours'], // Ensure string format
             4 => (string)$row['HourlyRate'],    // Ensure string format
-            5 => (string)$row['AnnualPay']      // Ensure string format
+            5 => (string)$row['AnnualPay'],      // Ensure string format
+            6 => (string)$row['Degree'],      // Ensure string format
+            7 => (string)$row['StandardDeptID'],      // Ensure string format
+            8 => (string)$row['StandardJobClassID'],      // Ensure string format
+            9 => (string)$row['deleted']      // Ensure string format
         ];
     }
     sqlsrv_free_stmt($stmt);
-
+error_log("loadDetaildata.php json:".json_encode(['success' => true, 'data' => $data, 'message' => 'Data loaded successfully.']));
     echo json_encode(['success' => true, 'data' => $data, 'message' => 'Data loaded successfully.']);
 } catch (Exception $e) {
     echo json_encode(['success' => false, 'message' => 'Error loading data: ' . $e->getMessage()]);
