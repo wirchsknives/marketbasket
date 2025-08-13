@@ -131,12 +131,23 @@
         let newRowData = { checked: true }; // Store temporary new row data
         let standardDepartments = []; // Store standard departments
         let standardJobClasses = []; // Store standard job classes
-        const columns = [
+   /*     const columns = [
             { id: 1, name: 'Department Code Desc' },
             { id: 2, name: 'Job Class Code Desc' },
             { id: 3, name: 'Scheduled Hours' },
             { id: 4, name: 'Hourly Rate' },
             { id: 5, name: 'Annual Pay' }
+        ]; */
+        const columns = [
+            { id: 10, name: 'Row' },
+            { id: 1, name: 'Department Code Desc' },
+            { id: 2, name: 'Job Class Code Desc' },
+            { id: 3, name: 'Scheduled Hours' },
+            { id: 4, name: 'Hourly Rate' },
+            { id: 5, name: 'Annual Pay' },
+            { id: 6, name: 'Degree' },
+            { id: 7, name: 'Standard Dept ID' },
+            { id: 8, name: 'Standard Job Class ID' }
         ];
 
         // Fetch standard departments and job classes
@@ -196,7 +207,8 @@ function renderTable(email = '', town = '') {
                 </thead>
                 <tbody>
     `;
-    tableData.forEach((row, index) => {
+
+/*    tableData.forEach((row, index) => {
         html += `
             <tr class="${row.checked ? 'checked-row' : 'unchecked-row'}">
                 <td><input type="checkbox" class="row-checkbox" data-index="${index}" ${row.checked ? 'checked' : ''}></td>
@@ -215,7 +227,82 @@ function renderTable(email = '', town = '') {
                 </td>
             </tr>
         `;
-    });
+    }); */
+/*    tableData.forEach((row, index) => {
+    const isChecked = row[9] === "1";
+
+    html += `
+        <tr class="${isChecked ? 'checked-row' : 'unchecked-row'}">
+            <td><input type="checkbox" class="row-checkbox" data-index="${index}" ${isChecked ? 'checked' : ''}></td>
+            ${columns.map(col => {
+                const content = row[col.id] || '';
+                if (col.id === 10) {
+                    // Row ID - non-editable plain text
+                    return `<td>${content}</td>`;
+                }
+                return `<td class="editable-cell ${isChecked && (!content || content.trim() === '') ? 'blank-cell' : ''}" data-index="${index}" data-column="${col.id}" contenteditable="true">${content}</td>`;
+            }).join('')}
+            <td>
+                <select class="form-control standard-dept" data-index="${index}" style="display:block;">
+                    <option value="">Select Standard Department</option>
+                    ${standardDepartments.map(dept => `<option value="${dept.id}" ${row[7] == dept.id ? 'selected' : ''}>${dept.StandardDeptDesc}</option>`).join('')}
+                </select>
+                <select class="form-control standard-job" data-index="${index}" style="display:none;">
+                    <option value="">Select Standard Job Class</option>
+                    ${standardJobClasses.map(job => `<option value="${job.id}" ${row[8] == job.id ? 'selected' : ''}>${job.StandardJobClassDesc}</option>`).join('')}
+                </select>
+            </td>
+        </tr>
+    `;
+}); */
+  tableData.forEach((row, index) => {
+    const isChecked = row[9] === "1";
+
+    html += `
+        <tr class="${isChecked ? 'unchecked-row' : 'checked-row'}">
+            <td><input type="checkbox" class="row-checkbox" data-index="${index}" ${isChecked ? '' : 'checked'}></td>
+            ${columns.map(col => {
+                if (col.id === 10) {
+                    // Row ID (non-editable text)
+                    return `<td>${row[col.id] || ''}</td>`;
+                }
+                if (col.id === 7) {
+                    // StandardDeptID dropdown
+                    return `
+                        <td>
+                            <select class="form-control standard-dept" data-index="${index}">
+                                <option value="">Select Standard Department</option>
+                                ${standardDepartments.map(dept => `
+                                    <option value="${dept.id}" ${row[7] == dept.id ? 'selected' : ''}>
+                                        ${dept.StandardDeptDesc}
+                                    </option>
+                                `).join('')}
+                            </select>
+                        </td>
+                    `;
+                }
+                if (col.id === 8) {
+                    // StandardJobClassID dropdown
+                    return `
+                        <td>
+                            <select class="form-control standard-job" data-index="${index}">
+                                <option value="">Select Standard Job Class</option>
+                                ${standardJobClasses.map(job => `
+                                    <option value="${job.id}" ${row[8] == job.id ? 'selected' : ''}>
+                                        ${job.StandardJobClassDesc}
+                                    </option>
+                                `).join('')}
+                            </select>
+                        </td>
+                    `;
+                }
+                // All other editable text cells
+                return `<td class="editable-cell ${isChecked && (!row[col.id] || row[col.id].trim() === '') ? 'blank-cell' : ''}" data-index="${index}" data-column="${col.id}" contenteditable="true">${row[col.id] || ''}</td>`;
+            }).join('')}
+        </tr>
+    `;
+});
+  
     html += `
             <tr class="checked-row new-row">
                 <td><input type="checkbox" checked></td>
