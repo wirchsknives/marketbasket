@@ -23,7 +23,7 @@ try {
     $departments = [];
     while ($row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) {
         $departments[] = [
-            'ID' => $row['ID'],
+            'id' => $row['ID'],
             'StandardDeptDesc' => $row['StandardDeptDesc']
         ];
     }
@@ -38,7 +38,7 @@ try {
     $jobClasses = [];
     while ($row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) {
         $jobClasses[] = [
-            'ID' => $row['ID'],
+            'id' => $row['ID'],
             'StandardJobClassDesc' => $row['StandardJobClassDesc'],
             'StandardDeptID' => $row['StandardDeptID']
         ];

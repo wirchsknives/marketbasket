@@ -39,7 +39,8 @@ error_log("loadDetailData.php department:".$row['DepartmentCodeDesc']);
             6 => (string)$row['Degree'],      // Ensure string format
             7 => (string)$row['StandardDeptID'],      // Ensure string format
             8 => (string)$row['StandardJobClassID'],      // Ensure string format
-            9 => (string)$row['deleted']      // Ensure string format
+            9 => (string)$row['deleted'],      // Ensure string format
+            10 => (string)$row['id']
         ];
     }
     sqlsrv_free_stmt($stmt);
