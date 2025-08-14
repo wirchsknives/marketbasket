@@ -202,7 +202,16 @@ function renderTable(email = '', town = '') {
                 <thead>
                     <tr>
                         <th><input type="checkbox" id="selectAll" ${tableData.every(row => row.checked) ? 'checked' : ''}></th>
-                        ${columns.map(col => `<th>${col.name}</th>`).join('')}
+                        
+            ${columns.map(col => {
+                if (col.id === 10) {
+                    // Row ID (non-editable text)
+                    //${columns.map(col => `<th>${col.name}</th>`).join('')}
+                    return `<th style=display:none; >${col.name}</th>`;
+                } else {
+                    return `<th>${col.name}</th>`;
+                }
+            }).join('')}
                     </tr>
                 </thead>
                 <tbody>
@@ -264,7 +273,7 @@ function renderTable(email = '', town = '') {
             ${columns.map(col => {
                 if (col.id === 10) {
                     // Row ID (non-editable text)
-                    return `<td>${row[col.id] || ''}</td>`;
+                    return `<td style=display:none; >${row[col.id] || ''}</td>`;
                 }
                 if (col.id === 7) {
                     // StandardDeptID dropdown
@@ -303,7 +312,7 @@ function renderTable(email = '', town = '') {
     `;
 });
   
-    html += `
+    /*html += `
             <tr class="checked-row new-row">
                 <td><input type="checkbox" checked></td>
                 ${columns.map(col => `
@@ -326,7 +335,57 @@ function renderTable(email = '', town = '') {
         <a href="analyzeMarketBasket.html" class="btn btn-secondary mt-3 ms-2">Analyze Data</a>
         <button type="button" class="btn btn-secondary mt-3 ms-2" onclick="showInputOptions()">Back to Input Options</button>
         </div>
-    `;
+    `; */
+  html += `
+    <tr class="checked-row new-row">
+        <td><input type="checkbox" checked></td>
+        ${columns.map((col, index) => {
+            if (col.id === 10) {
+                // Row ID (non-editable text)
+                return `<td style=display:none;>0</td>`;
+            }
+            // Column 7 = Standard Department
+            if (index === 7) {
+                return `
+                    <td>
+                        <select class="form-control standard-dept new-row" data-column="7" style="display:block;">
+                            <option value="">Select Standard Department</option>
+                            ${standardDepartments.map(dept => `
+                                <option value="${dept.id}" ${newRowData.standardDeptID == dept.id ? 'selected' : ''}>${dept.StandardDeptDesc}</option>
+                            `).join('')}
+                        </select>
+                    </td>
+                `;
+            }
+            // Column 8 = Standard Job Class
+            if (index === 8) {
+                return `
+                    <td>
+                        <select class="form-control standard-job new-row" data-column="8" style="display:block;">
+                            <option value="">Select Standard Job Class</option>
+                            ${standardJobClasses.map(job => `
+                                <option value="${job.id}" ${newRowData.standardJobClassID == job.id ? 'selected' : ''}>${job.StandardJobClassDesc}</option>
+                            `).join('')}
+                        </select>
+                    </td>
+                `;
+            }
+            // All other columns
+            return `
+                <td class="editable-cell new-row ${!newRowData[col.id] || newRowData[col.id].trim() === '' ? 'blank-cell' : ''}" data-column="${col.id}" contenteditable="true">
+                    ${newRowData[col.id] || ''}
+                </td>
+            `;
+        }).join('')}
+    </tr>
+</tbody>
+</table>
+<button type="button" id="submitDataBtn" class="btn btn-primary mt-3">Submit Data</button>
+<a href="analyzeMarketBasket.html" class="btn btn-secondary mt-3 ms-2">Analyze Data</a>
+<button type="button" class="btn btn-secondary mt-3 ms-2" onclick="showInputOptions()">Back to Input Options</button>
+</div>
+`;
+
     $('#divUserInput').html(html);
     validateAndToggleSubmitButton();
 }
@@ -653,15 +712,16 @@ console.table(response.data);
             const column = $(this).data('column');
             const value = $(this).text().trim();
             if (index !== undefined && tableData[index]) {
-                if ((column >= 3 && !isNaN(value) && value !== '') || (column < 3)) {
+                // Allow alphanumeric for columns 0, 1, and 6 (Transaction ID, Date, Category)
+                if ((column >= 3 && column !== 6 && !isNaN(value) && value !== '') || column < 3 || column === 6) {
                     tableData[index][column] = value;
                     $(this).removeClass('blank-cell');
                     if (tableData[index].checked && (!value || value.trim() === '')) {
                         $(this).addClass('blank-cell');
                     }
-                } else if (column >= 3) {
+                } else if (column >= 3 && column !== 6) {
                     $(this).text(tableData[index][column] || '');
-                    alert('Please enter a numeric value for ' + columns.find(c => c.id == column).name);
+                    alert('2 Please enter a numeric value for column '+column+' ' + columns.find(c => c.id == column).name);
                 }
             }
             validateAndToggleSubmitButton();
@@ -697,18 +757,18 @@ console.table(response.data);
             const value = $(this).text().trim();
             console.log('Input in column:', column, 'value:', value); // Debug
 
-            // Update newRowData and validate input
-            if ((column >= 3 && !isNaN(value) && value !== '') || (column < 3)) {
+            // Update newRowData and validate input column 6 is degree
+            if ((column >= 3 && column !== 6 && !isNaN(value) && value !== '') || column < 3 || column === 6) {
                 newRowData[column] = value;
                 $(this).removeClass('blank-cell');
                 if (!value || value.trim() === '') {
                     newRowData[column] = '';
                     $(this).addClass('blank-cell');
                 }
-            } else if (column >= 3 && value !== '') {
+            } else if (column >= 3 && column !== 6 && value !== '') {
                 $(this).text('');
                 newRowData[column] = '';
-                alert('Please enter a numeric value for ' + columns.find(c => c.id == column).name);
+                alert('3 Please enter a numeric value for ' + columns.find(c => c.id == column).name);
                 $(this).addClass('blank-cell');
                 return; // Exit to prevent checking row completion with invalid data
             }
@@ -765,9 +825,9 @@ console.table(response.data);
                     const value = $(this).text().trim();
                     if (value) {
                         hasData = true;
-                        if (col >= 3 && isNaN(value)) {
+                        if (col >= 3 && col !== 6 && isNaN(value)) {
                             isValid = false;
-                            alert('Please enter a numeric value for ' + columns.find(c => c.id == col).name);
+                            alert('4 Please enter a numeric value for ' + columns.find(c => c.id == col).name);
                             $(this).text('');
                             newRowData[col] = '';
                             $(this).addClass('blank-cell');

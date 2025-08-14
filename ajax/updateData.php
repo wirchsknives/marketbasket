@@ -92,16 +92,23 @@ error_log("updateData.php line 78 Setting header:".$headerIdInt." id:".$rowId);
     // Insert or update checked rows
     foreach ($data as $item) {
 error_log("updateData.php line 94 item: " . print_r($item, true));
-        if (isset($item['10']) && isset($item['checked']) && $item['checked'] ) {
+        if (isset($item['checked']) && $item['checked'] ) {
             $rowId = intval($item['10']);
+            $rowId = isset($item['10']) ? intval($item['10']) : 0; // 0 for new rows
             $departmentCodeDesc = isset($item['1']) ? trim($item['1']) : '';
             $jobClassCodeDesc = isset($item['2']) ? trim($item['2']) : '';
             $scheduledHours = isset($item['3']) ? trim(preg_replace('/[\$,]/', '', $item['3'])) : '';
             $hourlyRate = isset($item['4']) ? trim(preg_replace('/[\$,]/', '', $item['4'])) : '0.00';
             $annualPay = isset($item['5']) ? trim(preg_replace('/[\$,]/', '', $item['5'])) : '0.00';
             $degree = isset($item['6']) ? trim($item['6']) : '';
-            $standardDeptID = isset($item['standardDeptID']) ? $item['standardDeptID'] : null;
-            $standardJobClassID = isset($item['standardJobClassID']) ? $item['standardJobClassID'] : null;
+            if (isset($item['standardDeptID'])){
+                $standardDeptID = isset($item['standardDeptID']) ? $item['standardDeptID'] : null;
+                $standardJobClassID = isset($item['standardJobClassID']) ? $item['standardJobClassID'] : null;
+            } else {
+                $standardDeptID = isset($item['7']) ? $item['7'] : null;
+                $standardJobClassID = isset($item['8']) ? $item['8'] : null;
+            }
+            
 
             if ($departmentCodeDesc === '' || $jobClassCodeDesc === '' || ($scheduledHours === '' && !is_numeric($scheduledHours))) {
                 throw new Exception("Missing or invalid required fields for row $rowId.");
@@ -111,19 +118,21 @@ error_log("updateData.php line 94 item: " . print_r($item, true));
             $hourlyRate = floatval($hourlyRate);
             $annualPay = floatval($annualPay);
 
-            if (isset($existingRows[$rowId])) {
+            //if (isset($existingRows[$rowId])) {
+            if ($rowId > 0 && isset($existingRows[$rowId])) {
                 $queryUpdate = "UPDATE tblSalaryDetails 
                                 SET DepartmentCodeDesc = ?, JobClassCodeDesc = ?, ScheduledHours = ?, HourlyRate = ?, AnnualPay = ?, Degree = ?, StandardDeptID = ?, StandardJobClassID = ?, deleted = 0 
                                 WHERE headerid = ? AND id = ?";
                 $paramsUpdate = [$departmentCodeDesc, $jobClassCodeDesc, $scheduledHours, $hourlyRate, $annualPay, $degree, $standardDeptID, $standardJobClassID, $headerIdInt, $rowId];
                 $stmtUpdate = sqlsrv_query($connSql, $queryUpdate, $paramsUpdate);
                 if ($stmtUpdate === false) {
+error_log("updatData.php row 121 sql error standardDeptID:".$standardDeptID." standardJobClassID:".$standardJobClassID);                    
                     throw new Exception("Error updating row $rowId: " . print_r(sqlsrv_errors(), true));
                 }
                 sqlsrv_free_stmt($stmtUpdate);
             } else {
                 $queryInsert = "INSERT INTO tblSalaryDetails (headerid, DepartmentCodeDesc, JobClassCodeDesc, ScheduledHours, HourlyRate, AnnualPay, Degree, StandardDeptID, StandardJobClassID, deleted) 
-                                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)";
+                                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0)";
                 $paramsInsert = [$headerIdInt, $departmentCodeDesc, $jobClassCodeDesc, $scheduledHours, $hourlyRate, $annualPay, $degree, $standardDeptID, $standardJobClassID];
                 $stmtInsert = sqlsrv_query($connSql, $queryInsert, $paramsInsert);
                 if ($stmtInsert === false) {
